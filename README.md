@@ -45,42 +45,39 @@ Example program: triad
         interested, set enviroment variable WORKLOAD to be the function names (if you 
         have multiple functions interested, separated by comma):
         
-        ```
         export WORKLOAD=triad
         export WORKLOAD=md,md_kernel
-        ```
      
      b. Generate LLVM IR:
         
-        `clang -g -O1 -S -fno-slp-vectorize -fno-vectorize -fno-unroll-loops -fno-inline -emit-llvm -o triad.llvm triad.c`
+        clang -g -O1 -S -fno-slp-vectorize -fno-vectorize -fno-unroll-loops -fno-inline -emit-llvm -o triad.llvm triad.c
      
      c. Run LLVM-Tracer pass:
         Before you run, make sure you already built LLVM-Tracer. 
         Set `$TRACER_HOME` to where you put LLVM-Tracer code.
         
-        ```
+        
         export TRACER_HOME=/your/path/to/LLVM-Tracer
         opt -S -load=$TRACER_HOME/full-trace/full_trace.so -full trace triad.llvm -o triad-opt.llvm
         llvm-link -o full.llvm triad-opt.llvm $TRACER_HOME/profile-func/tracer_logger.llvm
-        ```
+        
      
      d. Generate machine code:
         
-        ```
+        
         llc -filetype=asm -o ful.s full.llvm
         gcc -fno-inline -o triad-instrumented full.s
-        ```
+        
      
-     e. Run binary:
+     e. Run binary. It will generate a file called `dynamic_trace` under current directory.
         
-        `./triad-instrumented`
+        ./triad-instrumented
         
-        It will generate a file called `dynamic_trace' under current directory. 
-  
-     We provide a python script to run the above steps automatically for SHOC. 
+         
+     f. We provide a python script to run the above steps automatically for SHOC. 
         
-        ```
+      
         cd /your/path/to/LLVM-Tracer/triad
         export TRACER_HOME=/your/path/to/LLVM-Tracer
         python llvm_compile.py $TRACER_HOME/example/triad triad
-        ```
+        
