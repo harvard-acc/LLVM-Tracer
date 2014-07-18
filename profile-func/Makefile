@@ -3,7 +3,7 @@ LLVM_SRC=$(LLVM_HOME)/llvm-src
 LLVM_BIN=$(LLVM_HOME)/
 
 #CFLAGS=-O3
-CFLAGS= -O3 -ggdb3 -fPIC -I/usr/include/c++/4.8.1/ -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS 
+CFLAGS= -O3 -fPIC -I/usr/include/c++/4.8.1/ -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS 
 
 trace_logger.llvm: trace_logger.c
 	$(LLVM_BIN)/bin/clang $(CFLAGS) -S -emit-llvm -c trace_logger.c -o trace_logger.llvm

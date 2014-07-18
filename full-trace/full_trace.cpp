@@ -274,7 +274,6 @@ namespace {
       if(line==0)
       {
 	      fprintf(static_trace, "\n%d,%s,%s,%s,%d\n", line, func_or_reg_id, bbID, instID, opty);
-	      fprintf(stderr, "\n%d,%s,%s,%s,%d\n", line, func_or_reg_id, bbID, instID, opty);
         
         Constant *v_func_id = ConstantDataArray::getString(curr_module->getContext(), func_or_reg_id, true);
         ArrayType* ArrayTy_0 = ArrayType::get(IntegerType::get(curr_module->getContext(), 8), (strlen(func_or_reg_id) + 1));

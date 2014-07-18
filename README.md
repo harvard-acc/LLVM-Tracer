@@ -17,15 +17,15 @@ Build:
      ```
      export $LLVM_HOME=/path/to/your/llvm/installation
      export $PATH=$LLVM_HOME/bin:$PATH
-     export $LD_LIBRARY_PATH=$LLVM_HOME/lib/:$PATH
+     export $LD_LIBRARY_PATH=$LLVM_HOME/lib/:$LD_LIBRARY_PATH
      ```
 
   2. Go to where you put LLVM-Tracer source code
      
      ```
-     cd /path/to/LLVM-Tracer/full-trace/;
+     cd /path/to/LLVM-Tracer/full-trace/
      make
-     cd /path/to/LLVM-Tracer/profile-func/;
+     cd /path/to/LLVM-Tracer/profile-func/
      make
      ```
 
@@ -38,11 +38,13 @@ Example program: triad
 ----------------------
   1. Go to /your/path/to/LLVM-Tracer/example/triad
   2. Run LLVM-Tracer to generate a dynamic LLVM IR trace
-     a. LLVM-Tracer tracks regions of interest inside a program. In the
-        triad example, we want to analyze the triad kernel instead of the setup
-        and initialization work done in main. To tell LLVM-Tracer the functions we are
+     a. LLVM-Tracer tracks regions of interest inside a program. 
+        In the triad example, we want to analyze the triad kernel instead of the setup
+        and initialization work done in main. 
+        To tell LLVM-Tracer the functions we are
         interested, set enviroment variable WORKLOAD to be the function names (if you 
         have multiple functions interested, separated by comma):
+        
         ```
         export WORKLOAD=triad
         export WORKLOAD=md,md_kernel
@@ -68,7 +70,6 @@ Example program: triad
         llc -filetype=asm -o ful.s full.llvm
         gcc -fno-inline -o triad-instrumented full.s
         ```
-     
      
      e. Run binary:
         
