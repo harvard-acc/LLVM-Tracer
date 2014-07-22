@@ -307,7 +307,6 @@ namespace {
         indices_instid.push_back(zero_instid);
         indices_instid.push_back(zero_instid);
         Constant * vv_inst = ConstantExpr::getGetElementPtr(gvar_array_instid, indices_instid);
-
         tl_call = IRB.CreateCall5(TL_log0, v_linenumber, vv_func_id, vv_bb, vv_inst, v_opty);
 	    }
       //print line with reg
@@ -521,8 +520,15 @@ namespace {
                               is_reg);
               }
             }
-            else
-            {
+            else if(curr_operand->getType()->isVectorTy()){
+	      bool is_reg = 0;
+              print_line(insertp, i+1, -1, NULL, phi, NULL,
+                         curr_operand->getType()->getTypeID(),
+                         getMemSize(curr_operand->getType()),
+                         NULL,
+                         is_reg);
+		}
+            else{
               bool is_reg = 0;
               print_line(insertp, i+1, -1, NULL, phi, NULL,
                           curr_operand->getType()->getTypeID(),

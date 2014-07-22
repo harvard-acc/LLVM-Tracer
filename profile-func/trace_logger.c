@@ -18,6 +18,8 @@ void trace_logger_init()
 {
 //std::ofstream full_trace_file;
   full_trace_file=fopen("dynamic_trace","w");
+  fprintf(full_trace_file,"print");
+
   if (full_trace_file==NULL){ 
     perror("Failed to open logfile \"dynamic_trace\"");
     exit(-1);
