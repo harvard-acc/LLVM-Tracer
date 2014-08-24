@@ -3,6 +3,13 @@ LLVM IR Trace Profiler (LLVM-Tracer) 0.1 Pre-release
 LLVM-Tracer is an LLVM instrumentation pass to print out a dynamic LLVM IR
 trace, including dynamic register values and memory addresses. 
 
+If you use LLVM-Tracer in your research, please cite:
+
+ISA-Independent Workload Characterization and its Implications for Specialized
+Architectures, 
+Yakun Sophia Shao and David Brooks, 
+International Symposium on Performance Analysis of Systems and Software
+(ISPASS), April 2013
 
 ============================================
 Requirements:

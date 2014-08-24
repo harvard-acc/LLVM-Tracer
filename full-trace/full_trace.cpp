@@ -520,14 +520,15 @@ namespace {
                               is_reg);
               }
             }
-            else if(curr_operand->getType()->isVectorTy()){
-	      bool is_reg = 0;
+            else if(curr_operand->getType()->isVectorTy())
+            {
+	            bool is_reg = 0;
               print_line(insertp, i+1, -1, NULL, phi, NULL,
                          curr_operand->getType()->getTypeID(),
                          getMemSize(curr_operand->getType()),
                          NULL,
                          is_reg);
-		}
+		        }
             else{
               bool is_reg = 0;
               print_line(insertp, i+1, -1, NULL, phi, NULL,
