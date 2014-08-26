@@ -60,11 +60,6 @@ char list_of_intrinsics[NUM_OF_INTRINSICS][25] = {
  };
 
 
-FILE *static_trace;
-void close_static_trace_file()
-{
-  fclose(static_trace);
-}
 namespace {
 
   struct fullTrace : public BasicBlockPass {
@@ -122,8 +117,6 @@ namespace {
     
     virtual bool doInitialization(Module &M) 
     {
-      static_trace = fopen("static_trace", "w");
-      atexit(&close_static_trace_file);
       // Add external trace_logger function declaratio
       TL_log0 = M.getOrInsertFunction( "trace_logger_log0", Type::getVoidTy(M.getContext()), 
                 Type::getInt64Ty(M.getContext()), 
@@ -169,7 +162,6 @@ namespace {
         cerr<<"Please set WORKLOAD as an environment variable!\n";
         return false;
       }
-      fprintf(stderr, "workload = %s\n", func_string);
       functions = str_split(func_string, ',', &num_of_functions);
 
       st = createSlotTracker(&M);
@@ -201,8 +193,8 @@ namespace {
     {
       int size = 0;
       if(T->isPointerTy())
-        return getMemSize(T->getPointerElementType());
-        //size = curr_module->getDataLayout()->getPointerTypeSizeInBits(T);
+        return 8*8;
+        //return getMemSize(T->getPointerElementType());
       else if(T->isFunctionTy())
         size = 0;	
       else if(T->isLabelTy())
@@ -273,7 +265,6 @@ namespace {
       //print line 0	
       if(line==0)
       {
-	      fprintf(static_trace, "\n%d,%s,%s,%s,%d\n", line, func_or_reg_id, bbID, instID, opty);
         
         Constant *v_func_id = ConstantDataArray::getString(curr_module->getContext(), func_or_reg_id, true);
         ArrayType* ArrayTy_0 = ArrayType::get(IntegerType::get(curr_module->getContext(), 8), (strlen(func_or_reg_id) + 1));
@@ -312,17 +303,7 @@ namespace {
       //print line with reg
 	    else
       {   
-	      if (line == RESULT_LINE)
-          fprintf(static_trace, "r,");
-        else
-          fprintf(static_trace, "%d,", line);
-        
-        if (func_or_reg_id == NULL)
-          fprintf(static_trace, "%d,%d,%d\n", opty, datasize, is_reg);
-        else
-          fprintf(static_trace, "%d,%d,%d,%s\n", opty, datasize, is_reg, func_or_reg_id);
-		    
-		    Value *v_is_reg;
+        Value *v_is_reg;
         v_is_reg = ConstantInt::get(IRB.getInt64Ty(), is_reg);
 		    Value *v_size;
         v_size = ConstantInt::get(IRB.getInt64Ty(), datasize);
@@ -413,8 +394,10 @@ namespace {
     {
 		  int id = st->getLocalSlot(itr);
       bool f = itr->hasName();
-      if(f) 
+      if(f)
+      {
         strcpy(instid, (char*)itr->getName().str().c_str());
+      }
       if(!f && id >= 0)
         sprintf(instid, "%d", id);
       else if(!f && id==-1) //strcpy(instid, bad);
@@ -464,104 +447,105 @@ namespace {
       //deal with phi nodes
       BasicBlock::iterator insertp = BB.getFirstInsertionPt();
       BasicBlock::iterator itr = BB.begin();
-      //if (dyn_cast<PHINode>(itr))
-      for(BasicBlock::iterator itr = BB.begin(); PHINode *N = dyn_cast<PHINode>(itr) ; itr++)
-      {	
-		    Value *curr_operand=NULL;
-  	    int size = 0, opcode;
-        char bbid[256], instid[256];
-        char operR[256];
-        int DataSize, value;
-		    
-        int line_number = -1;
+      if (dyn_cast<PHINode>(itr))
+      {
+        for(; PHINode *N = dyn_cast<PHINode>(itr) ; itr++)
+        {	
+          Value *curr_operand=NULL;
+          int size = 0, opcode;
+          char bbid[256], instid[256];
+          char operR[256];
+          int DataSize, value;
+          
+          int line_number = -1;
 
-        getBBId(&BB, bbid);
-        getInstId(itr, bbid, instid, instc);
-        opcode = itr->getOpcode();
-        
-        if (MDNode *N = itr->getMetadata("dbg")) 
-        {  
-          DILocation Loc(N);                      // DILocation is in DebugInfo.h
-          line_number = Loc.getLineNumber();
-        }
-		    
-        print_line(insertp, 0, line_number, funcName, bbid, instid, opcode);
+          getBBId(&BB, bbid);
+          getInstId(itr, bbid, instid, instc);
+          opcode = itr->getOpcode();
+          
+          if (MDNode *N = itr->getMetadata("dbg")) 
+          {  
+            DILocation Loc(N);                      // DILocation is in DebugInfo.h
+            line_number = Loc.getLineNumber();
+          }
+          print_line(insertp, 0, line_number, funcName, bbid, instid, opcode);
 
-        //for instructions using registers
-	      int i,num_of_operands = itr->getNumOperands();
-        
-        if(num_of_operands > 0)
-        {
-		      char phi[5] = "phi";
-          for(i = num_of_operands - 1; i >= 0; i--)
+          //for instructions using registers
+          int i,num_of_operands = itr->getNumOperands();
+          
+          if(num_of_operands > 0)
           {
-            curr_operand = itr->getOperand(i);
-            if(Instruction *I = dyn_cast<Instruction>(curr_operand))
+            char phi[5] = "phi";
+            for(i = num_of_operands - 1; i >= 0; i--)
+            {
+              curr_operand = itr->getOperand(i);
+              if(Instruction *I = dyn_cast<Instruction>(curr_operand))
+              {
+                bool is_reg = 1;
+                int flag = 0;
+                getInstId(I, NULL, operR, flag);
+                if(flag > 0) 
+                  fprintf(stderr, "!!This operand instruction does not have a name or ID!\n");
+                if(curr_operand->getType()->isVectorTy())
+                {
+                  print_line(insertp, i+1, -1, operR, phi, NULL,
+                              curr_operand->getType()->getTypeID(),
+                                getMemSize(curr_operand->getType()), 
+                                NULL,
+                                is_reg);
+                }
+                else
+                {
+                  print_line(insertp, i+1, -1, operR, phi, NULL,
+                              I->getType()->getTypeID(),
+                                getMemSize(I->getType()), 
+                                NULL, 
+                                is_reg);
+                }
+              }
+              else if(curr_operand->getType()->isVectorTy())
+              {
+                bool is_reg = 0;
+                print_line(insertp, i+1, -1, NULL, phi, NULL,
+                           curr_operand->getType()->getTypeID(),
+                           getMemSize(curr_operand->getType()),
+                           NULL,
+                           is_reg);
+              }
+              else{
+                bool is_reg = 0;
+                print_line(insertp, i+1, -1, NULL, phi, NULL,
+                            curr_operand->getType()->getTypeID(),
+                              getMemSize(curr_operand->getType()),
+                                curr_operand, 
+                                is_reg);
+              }
+            }
+          }
+          //Get result info: resR = instID
+          if(!itr->getType()->isVoidTy())
+          {
+            if(itr->getType()->isVectorTy())
             {
               bool is_reg = 1;
-              int flag = 0;
-              getInstId(I, NULL, operR, flag);
-              if(flag > 0) 
-                fprintf(stderr, "!!This operand instruction does not have a name or ID!\n");
-              if(curr_operand->getType()->isVectorTy())
-              {
-                print_line(insertp, i+1, -1, operR, phi, NULL,
-                            curr_operand->getType()->getTypeID(),
-                              getMemSize(curr_operand->getType()), 
-                              NULL,
-                              is_reg);
-              }
-              else
-              {
-                print_line(insertp, i+1, -1, operR, phi, NULL,
-                            I->getType()->getTypeID(),
-                              getMemSize(I->getType()), 
-                              NULL, 
-                              is_reg);
-              }
+              print_line(insertp, RESULT_LINE, -1, instid, NULL, NULL,
+                          itr->getType()->getTypeID(),
+                            getMemSize(itr->getType()),
+                              NULL, is_reg);
             }
-            else if(curr_operand->getType()->isVectorTy())
+            else if(itr->isTerminator())
+              fprintf(stderr, "It is terminator...\n");
+            else
             {
-	            bool is_reg = 0;
-              print_line(insertp, i+1, -1, NULL, phi, NULL,
-                         curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()),
-                         NULL,
-                         is_reg);
-		        }
-            else{
-              bool is_reg = 0;
-              print_line(insertp, i+1, -1, NULL, phi, NULL,
-                          curr_operand->getType()->getTypeID(),
-                            getMemSize(curr_operand->getType()),
-                              curr_operand, 
-                              is_reg);
+              bool is_reg = 1;
+              print_line(insertp, RESULT_LINE, -1, instid, NULL, NULL,
+                          itr->getType()->getTypeID(),
+                            getMemSize(itr->getType()),
+                              itr, is_reg);
             }
           }
         }
-        //Get result info: resR = instID
-		    if(!itr->getType()->isVoidTy())
-        {
-          if(itr->getType()->isVectorTy())
-          {
-            bool is_reg = 1;
-            print_line(insertp, RESULT_LINE, -1, instid, NULL, NULL,
-                        itr->getType()->getTypeID(),
-                          getMemSize(itr->getType()),
-                            NULL, is_reg);
-          }
-          else if(itr->isTerminator())
-            fprintf(stderr, "It is terminator...\n");
-          else
-          {
-            bool is_reg = 1;
-            print_line(insertp, RESULT_LINE, -1, instid, NULL, NULL,
-                        itr->getType()->getTypeID(),
-                          getMemSize(itr->getType()),
-                            itr, is_reg);
-          }
-        }
-	    }
+      }
 
       //for ALL instructions
       BasicBlock::iterator nextitr;
@@ -579,7 +563,6 @@ namespace {
 
         //Get static BasicBlock ID: produce bbid
         getBBId(&BB, bbid);	
-        
         //Get static instruction ID: produce instid
         getInstId(itr, bbid, instid, instc);
         
@@ -595,23 +578,21 @@ namespace {
         if(CallInst *I = dyn_cast<CallInst>(itr))
         {
           char callfunc[30];
-          strcpy(callfunc, I->getCalledFunction()->getName().str().c_str());
-          if(trace_or_not(callfunc)==-1)
-            continue;
+          Function *fun = I->getCalledFunction();
+          if (fun)
+            strcpy(callfunc, fun->getName().str().c_str());
+            if(trace_or_not(callfunc)==-1)
+              continue;
         }
         print_line(itr, 0, line_number, funcName, bbid, instid, opcode);
-
         //for instructions using registers
-	      //Get registers: operR1, operR2, resR
 	      int i, num_of_operands = itr->getNumOperands();
 	
-	      //if(num_of_operands > OPER) 
-          //fprintf(stderr, "!!More operands than expected! It has %d for opcode name %s.\n", num_of_operands, itr->getOpcodeName());
 	      if(num_of_operands > 0 )
         {
           for(i = num_of_operands - 1; i >= 0; i--)
           {
-			      curr_operand = itr->getOperand(i);
+            curr_operand = itr->getOperand(i);
             int flag = 0;
             if(Instruction *I = dyn_cast<Instruction>(curr_operand))
             {
@@ -621,17 +602,21 @@ namespace {
               if(flag>0) 
                 fprintf(stderr, "!!This operand instruction does not have a name or ID!\n");
               if(curr_operand->getType()->isVectorTy())
+              {
                 print_line(itr, i+1, -1, operR, NULL, NULL,
                             curr_operand->getType()->getTypeID(),
                               getMemSize(curr_operand->getType()), 
                               NULL,
                               is_reg);
+              }
               else 
+              {
                 print_line(itr, i+1, -1, operR, NULL, NULL, 
                             I->getType()->getTypeID(), 
                               getMemSize(I->getType()), 
                               curr_operand, 
                               is_reg);
+              }
             }
             else
             {
@@ -641,7 +626,6 @@ namespace {
                 char operand_id[256];
                 strcpy(operand_id, curr_operand->getName().str().c_str());
                 print_line(itr, i+1, -1, operand_id, NULL, NULL, 
-                    //print_line(itr, i+1, NULL, NULL, NULL,
                             curr_operand->getType()->getTypeID(),
                               getMemSize(curr_operand->getType()), 
                               NULL,
@@ -671,7 +655,6 @@ namespace {
               }
               else 
               {
-                //printf("here %d %d\n", curr_operand->getType()->getTypeID(), curr_operand->getValueID());
                 char operand_id[256];
                 strcpy(operand_id, curr_operand->getName().str().c_str());
                 print_line(itr, i+1, -1, operand_id, NULL, NULL, 
@@ -683,7 +666,6 @@ namespace {
             }	
 		      }	
 	      }
-
         //Get result info: resR = instID
         if(!itr->getType()->isVoidTy())
         {
