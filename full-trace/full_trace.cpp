@@ -24,7 +24,7 @@ using namespace llvm;
 using namespace std;
 
 char list_of_intrinsics[NUM_OF_INTRINSICS][25] = {
-	"llvm.memcoy",	// standard C lib
+	"llvm.memcpy",	// standard C lib
 	"llvm.memmove",
 	"llvm.memset",
 	"llvm.sqrt",
