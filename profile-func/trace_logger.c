@@ -5,6 +5,7 @@
 #include <string.h>
 #include <assert.h>
 #define RESULT_LINE 19134
+#define FORWARD_LINE 24601
 
 void trace_logger_init();
 void trace_logger_log0(int line_number, char *name, char *bbid, char *instid, int opcode);
@@ -45,6 +46,8 @@ void trace_logger_log_int(int line, int size, int64_t value, int is_reg, char *l
   assert(initp == 1);
 	if(line==RESULT_LINE)	
     fprintf(full_trace_file, "r,%d,%ld,%d,%s\n", size, value, is_reg, label);
+	else if(line==FORWARD_LINE)	
+    fprintf(full_trace_file, "f,%d,%ld,%d,%s\n", size, value, is_reg, label);
 	else
   	fprintf(full_trace_file, "%d,%d,%ld,%d,%s\n", line, size, value, is_reg, label);
 }
@@ -53,6 +56,8 @@ void trace_logger_log_double(int line, int size, double value, int is_reg, char 
   assert(initp == 1);
 	if(line==RESULT_LINE) 
     fprintf(full_trace_file, "r,%d,%f,%d,%s\n", size, value, is_reg, label);
+	else if(line==FORWARD_LINE) 
+    fprintf(full_trace_file, "f,%d,%f,%d,%s\n", size, value, is_reg, label);
   else
 	  fprintf(full_trace_file, "%d,%d,%f,%d,%s\n",line, size, value, is_reg, label);
 }
@@ -62,6 +67,8 @@ void trace_logger_log_int_noreg(int line, int size, int64_t value, int is_reg)
   assert(initp == 1);
 	if(line==RESULT_LINE)	
     fprintf(full_trace_file, "r,%d,%ld,%d\n", size, value, is_reg);
+	else if(line==FORWARD_LINE)	
+    fprintf(full_trace_file, "f,%d,%ld,%d\n", size, value, is_reg);
 	else
   	fprintf(full_trace_file, "%d,%d,%ld,%d\n", line, size, value, is_reg);
 }
@@ -70,6 +77,8 @@ void trace_logger_log_double_noreg(int line, int size, double value, int is_reg)
   assert(initp == 1);
 	if(line==RESULT_LINE) 
     fprintf(full_trace_file, "r,%d,%f,%d\n", size, value, is_reg);
+	else if(line==FORWARD_LINE) 
+    fprintf(full_trace_file, "f,%d,%f,%d\n", size, value, is_reg);
   else
 	  fprintf(full_trace_file, "%d,%d,%f,%d\n",line, size, value, is_reg);
 }
