@@ -14,6 +14,8 @@ void trace_logger_fin();
 
 FILE *full_trace_file;
 int initp=0;
+
+int inst_count = 0;
 void trace_logger_init()
 {
   full_trace_file=fopen("dynamic_trace","w");
@@ -38,7 +40,8 @@ void trace_logger_log0(int line_number, char *name, char *bbid, char *instid, in
     trace_logger_init();
     initp=1;
   }
-  fprintf(full_trace_file, "\n0,%d,%s,%s,%s,%d\n", line_number, name, bbid, instid, opcode);
+  fprintf(full_trace_file, "\n0,%d,%s,%s,%s,%d,%d\n", line_number, name, bbid, instid, opcode,inst_count);
+  inst_count++;
 }
 
 void trace_logger_log_int(int line, int size, int64_t value, int is_reg, char *label)
