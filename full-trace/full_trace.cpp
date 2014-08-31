@@ -178,7 +178,7 @@ namespace {
         return 1;
       for(int i = 0; i < NUM_OF_INTRINSICS; i++)
         if(strstr(func, list_of_intrinsics[i]) == func)
-          return i;
+          return i+2;
       return -1;
 	  }
 
@@ -585,20 +585,21 @@ namespace {
           DILocation Loc(N);                      // DILocation is in DebugInfo.h
           line_number = Loc.getLineNumber();
         }
-        
+        int callType = -1;
         if(CallInst *I = dyn_cast<CallInst>(itr))
         {
-          char callfunc[30];
+          char callfunc[256];
           Function *fun = I->getCalledFunction();
           if (fun)
             strcpy(callfunc, fun->getName().str().c_str());
-            if(trace_or_not(callfunc)==-1)
+            callType = trace_or_not(callfunc);
+            if(callType ==-1)
               continue;
         }
         print_line(itr, 0, line_number, funcName, bbid, instid, opcode);
         
         int i, num_of_operands = itr->getNumOperands();
-        if (itr->getOpcode() == Instruction::Call)
+        if (itr->getOpcode() == Instruction::Call && callType == 1)
         {
           CallInst *CI = dyn_cast<CallInst>(itr);
           Function *fun = CI->getCalledFunction();
