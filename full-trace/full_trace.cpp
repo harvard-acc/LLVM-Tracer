@@ -179,9 +179,12 @@ namespace {
     {
       if (is_tracking_function(func))
         return 1;
-      for(int i = 0; i < NUM_OF_INTRINSICS; i++)
-        if(strstr(func, list_of_intrinsics[i]) == func)
-          if ( i < NUM_OF_LLVM_INTRINSICS)
+      for (int i = 0; i < NUM_OF_INTRINSICS; i++)
+        if (strstr(func, list_of_intrinsics[i]) == func)
+          // TODO: Super hacky way of ensuring that dmaLoad and dmaStore always
+          // get tracked (by adding them as llvm intrinsics). We should come up
+          // with a better way of doing this...
+          if (i < NUM_OF_LLVM_INTRINSICS)
             return i+2;
           else
             return 1;
