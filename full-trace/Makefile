@@ -16,7 +16,7 @@ ifeq ($(SYSTEM), Linux)
           -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS \
           -I$(LLVM_HOME)/include/llvm-3.4 -I$(LLVM_HOME)/include/llvm-c-3.4 
 
-	LDFLAGS=  -shared 
+	LDFLAGS= -shared 
 endif
 
 full_trace.so  : %.so: %.cpp
