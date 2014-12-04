@@ -502,7 +502,8 @@ namespace {
             for(i = num_of_operands - 1; i >= 0; i--)
             {
               curr_operand = itr->getOperand(i);
-              is_reg = 0;
+              //is_reg = 0;
+              is_reg = curr_operand->hasName();
               if(Instruction *I = dyn_cast<Instruction>(curr_operand))
               {
                 int flag = 0;
@@ -527,14 +528,18 @@ namespace {
               }
               else if(curr_operand->getType()->isVectorTy())
               {
-                print_line(insertp, i+1, -1, NULL, phi, NULL,
+                char operand_id[256];
+                strcpy(operand_id, curr_operand->getName().str().c_str());
+                print_line(insertp, i+1, -1, operand_id, phi, NULL,
                            curr_operand->getType()->getTypeID(),
                            getMemSize(curr_operand->getType()),
                            NULL,
                            is_reg);
               }
               else{
-                print_line(insertp, i+1, -1, NULL, phi, NULL,
+                char operand_id[256];
+                strcpy(operand_id, curr_operand->getName().str().c_str());
+                print_line(insertp, i+1, -1, operand_id, phi, NULL,
                             curr_operand->getType()->getTypeID(),
                               getMemSize(curr_operand->getType()),
                                 curr_operand,
@@ -609,7 +614,7 @@ namespace {
         int i, num_of_operands = itr->getNumOperands();
         if (itr->getOpcode() == Instruction::Call && callType == 1)
         {
-          
+
           CallInst *CI = dyn_cast<CallInst>(itr);
           Function *fun = CI->getCalledFunction();
           strcpy(operR, (char*)fun->getName().str().c_str());
