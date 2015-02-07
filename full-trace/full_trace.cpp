@@ -703,7 +703,7 @@ namespace {
                             curr_operand->getType()->getTypeID(),
                               getMemSize(curr_operand->getType()),
                               NULL,
-                              is_reg);
+                              true);
                 print_line(itr, FORWARD_LINE, -1, curr_arg_name, NULL, NULL,
                     curr_operand->getType()->getTypeID(),
                     getMemSize(curr_operand->getType()),
@@ -801,7 +801,7 @@ namespace {
                               curr_operand->getType()->getTypeID(),
                                 getMemSize(curr_operand->getType()),
                                 NULL,
-                                is_reg);
+                                true);
                 }
                 // is function
                 else if(curr_operand->getValueID()==2)
