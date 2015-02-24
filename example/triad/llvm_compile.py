@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 import os
 import sys
 
@@ -7,10 +7,10 @@ kernels = {
 }
 
 def main (directory, source):
-  
+
   if not 'TRACER_HOME' in os.environ:
     raise Exception('Set TRACER_HOME directory as an environment variable')
-  
+
   os.chdir(directory)
   obj = source + '.llvm'
   opt_obj = source + '-opt.llvm'

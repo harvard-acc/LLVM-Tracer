@@ -1,5 +1,6 @@
 namespace std { class type_info; }
 #include <vector>
+#include <map>
 #include <cmath>
 #include "llvm/Pass.h"
 #include "llvm/IR/BasicBlock.h"
@@ -80,6 +81,7 @@ namespace {
 
     char **functions;
     int num_of_functions;
+    std::map<string, string> mangled_to_original_name;
 
     char ** str_split (char *a_str, const char a_delim, int *size)
     {
@@ -172,6 +174,16 @@ namespace {
       st->initialize();
       curr_module = &M;
       curr_function = NULL;
+
+      DebugInfoFinder Finder;
+      Finder.processModule(M);
+      for (DebugInfoFinder::iterator i = Finder.subprogram_begin(),
+          e = Finder.subprogram_end(); i != e; ++i) {
+        DISubprogram S(*i);
+        mangled_to_original_name[S.getLinkageName().str()] = S.getName().str();
+      }
+
+
       return false;
     }
 
@@ -462,7 +474,7 @@ namespace {
         st->incorporateFunction(F);
         curr_function = F;
       }
-	    strcpy(funcName, curr_function->getName().str().c_str());
+	    strcpy(funcName, mangled_to_original_name[curr_function->getName().str()].c_str());
 	    if(!is_tracking_function(funcName))
         return false;
 
