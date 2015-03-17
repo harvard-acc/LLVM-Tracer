@@ -180,7 +180,7 @@ namespace {
       for (DebugInfoFinder::iterator i = Finder.subprogram_begin(),
           e = Finder.subprogram_end(); i != e; ++i) {
         DISubprogram S(*i);
-        mangled_to_original_name[S.getLinkageName().str()] = S.getName().str();
+        	mangled_to_original_name[S.getLinkageName().str()] = S.getName().str();
       }
 
 
@@ -474,7 +474,14 @@ namespace {
         st->incorporateFunction(F);
         curr_function = F;
       }
-	    strcpy(funcName, mangled_to_original_name[curr_function->getName().str()].c_str());
+      std::map<string,string>::iterator it = mangled_to_original_name.find(curr_function->getName().str());
+      if (it != mangled_to_original_name.end()){
+	    strcpy(funcName, it->second.c_str());
+      }
+      else{
+        strcpy(funcName, curr_function->getName().str().c_str());
+      }
+	    
 	    if(!is_tracking_function(funcName))
         return false;
 
