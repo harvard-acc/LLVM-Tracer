@@ -1,4 +1,4 @@
-LLVM IR Trace Profiler (LLVM-Tracer) 1.0 Public Release
+LLVM IR Trace Profiler (LLVM-Tracer) 1.1 Public Release
 ============================================
 LLVM-Tracer is an LLVM instrumentation pass to print out a dynamic LLVM IR
 trace, including dynamic register values and memory addresses.

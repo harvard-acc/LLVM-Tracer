@@ -21,7 +21,7 @@ int main(){
 	}
 
 	triad(&a[0],&b[0],&c[0],3);
-  
+
   FILE *output;
   output = fopen("output.data", "w");
 	for(i=0; i<NUM; i++)

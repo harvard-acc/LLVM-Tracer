@@ -22,7 +22,7 @@ def main (directory, source):
   os.system('opt -disable-inlining -S -load=' + os.getenv('TRACER_HOME') + '/full-trace/full_trace.so -fulltrace ' + obj + ' -o ' + opt_obj)
   os.system('llvm-link -o full.llvm ' + opt_obj + ' ' + os.getenv('TRACER_HOME') + '/profile-func/trace_logger.llvm')
   os.system('llc -O0 -disable-fp-elim -filetype=asm -o full.s full.llvm')
-  os.system('gcc -static -O0 -fno-inline -o ' + executable + ' full.s -lm')
+  os.system('gcc -static -O0 -fno-inline -o ' + executable + ' full.s -lm -lz')
   os.system('./' + executable)
 
 if __name__ == '__main__':

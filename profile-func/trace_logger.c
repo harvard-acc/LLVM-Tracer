@@ -21,7 +21,7 @@ void trace_logger_init()
 {
   full_trace_file=gzopen("dynamic_trace.gz","w");
 
-  if (full_trace_file==NULL){
+  if (full_trace_file==NULL) {
     perror("Failed to open logfile \"dynamic_trace\"");
     exit(-1);
   }
@@ -30,14 +30,12 @@ void trace_logger_init()
 
 void trace_logger_fin()
 {
-  int i;
-
   gzclose(full_trace_file);
 }
 
 void trace_logger_log0(int line_number, char *name, char *bbid, char *instid, int opcode)
 {
-  if(!initp) {
+  if (!initp) {
     trace_logger_init();
     initp=1;
   }
@@ -45,45 +43,41 @@ void trace_logger_log0(int line_number, char *name, char *bbid, char *instid, in
   inst_count++;
 }
 
-void trace_logger_log_int(int line, int size, int64_t value, int is_reg, char *label)
+void trace_logger_log_int(int line, int size, int64_t value, int is_reg,
+                          char *label, int is_phi, char *prev_bbid)
 {
   assert(initp == 1);
-	if(line==RESULT_LINE)
-    gzprintf(full_trace_file, "r,%d,%ld,%d,%s\n", size, value, is_reg, label);
-	else if(line==FORWARD_LINE)
-    gzprintf(full_trace_file, "f,%d,%ld,%d,%s\n", size, value, is_reg, label);
-	else
-  	gzprintf(full_trace_file, "%d,%d,%ld,%d,%s\n", line, size, value, is_reg, label);
-}
-void trace_logger_log_double(int line, int size, double value, int is_reg, char *label)
-{
-  assert(initp == 1);
-	if(line==RESULT_LINE)
-    gzprintf(full_trace_file, "r,%d,%f,%d,%s\n", size, value, is_reg, label);
-	else if(line==FORWARD_LINE)
-    gzprintf(full_trace_file, "f,%d,%f,%d,%s\n", size, value, is_reg, label);
+  if (line == RESULT_LINE)
+    gzprintf(full_trace_file, "r,%d,%ld,%d", size, value, is_reg);
+  else if (line == FORWARD_LINE)
+    gzprintf(full_trace_file, "f,%d,%ld,%d", size, value, is_reg);
   else
-	  gzprintf(full_trace_file, "%d,%d,%f,%d,%s\n",line, size, value, is_reg, label);
-}
-
-void trace_logger_log_int_noreg(int line, int size, int64_t value, int is_reg)
-{
-  assert(initp == 1);
-	if(line==RESULT_LINE)
-    gzprintf(full_trace_file, "r,%d,%ld,%d\n", size, value, is_reg);
-	else if(line==FORWARD_LINE)
-    gzprintf(full_trace_file, "f,%d,%ld,%d\n", size, value, is_reg);
-	else
-  	gzprintf(full_trace_file, "%d,%d,%ld,%d\n", line, size, value, is_reg);
-}
-void trace_logger_log_double_noreg(int line, int size, double value, int is_reg)
-{
-  assert(initp == 1);
-	if(line==RESULT_LINE)
-    gzprintf(full_trace_file, "r,%d,%f,%d\n", size, value, is_reg);
-	else if(line==FORWARD_LINE)
-    gzprintf(full_trace_file, "f,%d,%f,%d\n", size, value, is_reg);
+    gzprintf(full_trace_file, "%d,%d,%ld,%d", line, size, value, is_reg);
+  if (is_reg)
+    gzprintf(full_trace_file, ",%s", label);
   else
-	  gzprintf(full_trace_file, "%d,%d,%f,%d\n",line, size, value, is_reg);
+    gzprintf(full_trace_file, ", ");
+  if (is_phi)
+    gzprintf(full_trace_file, ",%s,\n", prev_bbid);
+  else
+    gzprintf(full_trace_file, ",\n");
 }
-
+void trace_logger_log_double(int line, int size, double value, int is_reg,
+                             char *label, int is_phi, char *prev_bbid)
+{
+  assert(initp == 1);
+  if (line == RESULT_LINE)
+    gzprintf(full_trace_file, "r,%d,%f,%d", size, value, is_reg);
+  else if (line == FORWARD_LINE)
+    gzprintf(full_trace_file, "f,%d,%f,%d", size, value, is_reg);
+  else
+    gzprintf(full_trace_file, "%d,%d,%f,%d",line, size, value, is_reg);
+  if (is_reg)
+    gzprintf(full_trace_file, ",%s", label);
+  else
+    gzprintf(full_trace_file, ", ");
+  if (is_phi)
+    gzprintf(full_trace_file, ",%s,\n", prev_bbid);
+  else
+    gzprintf(full_trace_file, ",\n");
+}
