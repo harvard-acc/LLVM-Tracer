@@ -11,7 +11,7 @@
 #include "llvm/Analysis/CFG.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Constants.h"
-#include "llvm/DebugInfo.h"
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DerivedTypes.h"
 //#include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/Assembly/PrintModulePass.h"
