@@ -14,7 +14,7 @@ International Symposium on Performance Analysis of Systems and Software
 ============================================
 Requirements:
 -------------------
-  LLVM 3.4 and Clang 3.4 64-bit
+  LLVM 3.4.0 and Clang 3.4.0 64-bit
 
 Build:
 ------
