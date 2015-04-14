@@ -12,8 +12,8 @@ class type_info;
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/DebugInfo.h"
-#include <string.h>
-#include <stdlib.h>
+#include <cstring>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <string>
