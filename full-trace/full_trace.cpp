@@ -12,11 +12,13 @@ class type_info;
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/DebugInfo.h"
-#include <string.h>
-#include <stdlib.h>
+#include <cstring>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <set>
+#include <sstream>
 #include "SlotTracker.h"
 
 #define NUM_OF_INTRINSICS 35
@@ -28,6 +30,18 @@ class type_info;
 using namespace llvm;
 using namespace std;
 
+namespace {
+
+  void split(const std::string &s, const char delim, std::set<std::string> &elems) {
+      std::istringstream ss(s);
+      std::string item;
+      while (std::getline(ss, item, delim)) {
+          elems.insert(item);
+      }
+  }
+
+
+}// end of anonymous namespace
 char list_of_intrinsics[NUM_OF_INTRINSICS]
                        [25] = { "llvm.memcpy", // standard C lib
                                 "llvm.memmove", "llvm.memset", "llvm.sqrt",
@@ -63,42 +77,8 @@ struct fullTrace : public BasicBlockPass {
   SlotTracker *st;
   Function *curr_function;
 
-  char **functions;
-  int num_of_functions;
+  std::set<std::string> functions;
   std::map<string, string> mangled_to_original_name;
-
-  char **str_split(char *a_str, const char a_delim, int *size) {
-    int count = 0;
-    char *tmp = a_str;
-    char *last_comma = 0;
-    char delim[2];
-    delim[0] = a_delim;
-    delim[1] = 0;
-
-    while (*tmp) {
-      if (a_delim == *tmp) {
-        count++;
-        last_comma = tmp;
-      }
-      tmp++;
-    }
-    count++;
-
-    char **result;
-    result = (char **)malloc(sizeof(char *) * count);
-    if (result) {
-      int idx = 0;
-      char *token = strtok(a_str, delim);
-      while (token) {
-        assert(idx < count);
-        *(result + idx) = strdup(token);
-        idx++;
-        token = strtok(0, delim);
-      }
-    }
-    *size = count;
-    return result;
-  }
 
   virtual bool doInitialization(Module &M) {
     // Add external trace_logger function declaratio
@@ -123,13 +103,12 @@ struct fullTrace : public BasicBlockPass {
         Type::getInt8PtrTy((M.getContext())), Type::getInt64Ty(M.getContext()),
         Type::getInt8PtrTy((M.getContext())), NULL);
 
-    char *func_string;
-    func_string = getenv("WORKLOAD");
-    if (func_string == NULL) {
+    std::string func_string = getenv("WORKLOAD");
+    if (func_string.empty()) {
       std::cerr << "Please set WORKLOAD as an environment variable!\n";
       return false;
     }
-    functions = str_split(func_string, ',', &num_of_functions);
+    split(func_string, ',', this->functions);
 
     st = createSlotTracker(&M);
     st->initialize();
@@ -165,9 +144,11 @@ struct fullTrace : public BasicBlockPass {
   }
 
   bool is_tracking_function(string func) {
-    for (int i = 0; i < num_of_functions; i++)
-      if (strcmp(*(functions + i), func.c_str()) == 0)
+    // perform search in log(n) time.
+    std::set<std::string>::iterator it = this->functions.find(func);
+    if (it != this->functions.end()) {
         return true;
+    }
     return false;
   }
 

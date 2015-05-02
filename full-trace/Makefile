@@ -6,13 +6,13 @@ all: full_trace.so
 
 SYSTEM=$(shell uname)
 ifeq ($(SYSTEM), Darwin)
-	CFLAGS=  -fno-common  -I/usr/include/c++/4.2.1/ \
+	CFLAGS=  -fno-rtti -fno-common  -I/usr/include/c++/4.2.1/ \
            -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS \
            -I$(LLVM_HOME)/include/llvm -I$(LLVM_HOME)/include/llvm-c
 	LDFLAGS=  -dynamiclib -Wl,-flat_namespace -Wl,-undefined,suppress
 endif
 ifeq ($(SYSTEM), Linux)
-	CFLAGS= -O3 -fPIC -I/usr/include/c++/4.2.1/  \
+	CFLAGS= -fno-rtti -O3 -fPIC -I/usr/include/c++/4.2.1/  \
           -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS \
           -I$(LLVM_HOME)/include/llvm -I$(LLVM_HOME)/include/llvm-c
 

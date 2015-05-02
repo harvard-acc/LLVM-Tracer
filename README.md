@@ -65,14 +65,14 @@ Example program: triad
 
 
         export TRACER_HOME=/your/path/to/LLVM-Tracer
-        opt -S -load=$TRACER_HOME/full-trace/full_trace.so -full trace triad.llvm -o triad-opt.llvm
+        opt -S -load=$TRACER_HOME/full-trace/full_trace.so -fulltrace triad.llvm -o triad-opt.llvm
         llvm-link -o full.llvm triad-opt.llvm $TRACER_HOME/profile-func/tracer_logger.llvm
 
 
      d. Generate machine code:
 
 
-        llc -filetype=asm -o ful.s full.llvm
+        llc -filetype=asm -o full.s full.llvm
         gcc -fno-inline -o triad-instrumented full.s
 
 
