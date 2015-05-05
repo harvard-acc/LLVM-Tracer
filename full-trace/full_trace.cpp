@@ -79,6 +79,15 @@ struct fullTrace : public BasicBlockPass {
   std::set<std::string> functions;
   std::map<string, string> mangled_to_original_name;
 
+  // This BasicBlcokPass may be called by other program.
+  // provide a way to set up workload, not just environment variable
+  std::string my_workload;
+
+  void setWorkload(std::string workload)
+  {
+      this->my_workload = workload;
+  }
+
   virtual bool doInitialization(Module &M) {
     // Add external trace_logger function declaratio
     TL_log0 = M.getOrInsertFunction(
@@ -102,7 +111,13 @@ struct fullTrace : public BasicBlockPass {
         Type::getInt8PtrTy((M.getContext())), Type::getInt64Ty(M.getContext()),
         Type::getInt8PtrTy((M.getContext())), NULL);
 
-    std::string func_string = getenv("WORKLOAD");
+    std::string func_string;
+    if (this->my_workload.empty()) {
+      func_string = getenv("WORKLOAD");
+    } else {
+      func_string = this->my_workload;
+    }
+
     if (func_string.empty()) {
       std::cerr << "Please set WORKLOAD as an environment variable!\n";
       return false;
