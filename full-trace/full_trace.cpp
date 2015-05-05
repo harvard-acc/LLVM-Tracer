@@ -116,8 +116,8 @@ struct fullTrace : public BasicBlockPass {
 
     DebugInfoFinder Finder;
     Finder.processModule(M);
-    for (DebugInfoFinder::iterator i = Finder.subprogram_begin(),
-                                   e = Finder.subprogram_end();
+    for (auto i = Finder.subprograms().begin(),
+              e = Finder.subprograms().end();
          i != e; ++i) {
       DISubprogram S(*i);
       mangled_to_original_name[S.getLinkageName().str()] = S.getName().str();
