@@ -1,5 +1,5 @@
 # In two-number form only. PinaVM will determine the patch version for you.
-SET(LLVM_RECOMMAND_VERSION 3.4)
+SET(LLVM_RECOMMAND_VERSION 3.5)
 
 # TODO the llvm libraries which PinaVM need.
 SET(NEED_LLVM_LIB mcjit native bitwriter jit interpreter
