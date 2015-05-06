@@ -14,10 +14,34 @@ International Symposium on Performance Analysis of Systems and Software
 ============================================
 Requirements:
 -------------------
-  LLVM 3.4.0 and Clang 3.4.0 64-bit
+  LLVM 3.5 and Clang 3.5 64-bit
 
-Build:
-------
+Build with CMake:
+-----------------
+  CMake is a configure tool which allows you to out-of-source build
+  Requires CMake newer than 2.8.8
+
+  1. Set `LLVM_HOME` to where you installed LLVM
+     ```
+     export $LLVM_HOME=/path/to/your/llvm/installation
+     ```
+
+  2. configure with CMake and build LLVM-Tracer source code
+     ```
+     cd /path/to/build/LLVM-Tracer/
+     cmake /path/to/LLVM-Tracer/
+     make
+     ```
+
+  3. (Optional) Try running triad example, which is built by CMake.
+     ```
+     cd /path/to/build/LLVM-Tracer/example/triad
+     ./triad-instrumented
+     ```
+
+Build with Makefile:
+---------------------
+
   1. Set `LLVM_HOME` to where you installed LLVM
      Add LLVM and Clang binary to your PATH:
 
