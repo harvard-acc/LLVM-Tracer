@@ -39,6 +39,21 @@ Build with CMake:
      ./triad-instrumented
      ```
 
+  4. Available CMake settings
+     ```
+     -DLLVM_ROOT=/where/your/llvm/install
+       You may denote the path of LLVM to find/install by this option. if
+       this option is not defined, environment variable LLVM_HOME will be
+       used.
+
+     -DAUTOINSTALL=TRUE
+       By this option, CMake scripts will automatically download, build and
+       install LLVM for you if finds no LLVM installation.
+
+     -DCMAKE_BUILD_TYPE=None,Debug,Release
+       You can choose one from three of bulid types.
+     ```
+
 Build with Makefile:
 ---------------------
 
