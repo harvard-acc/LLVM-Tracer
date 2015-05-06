@@ -18,8 +18,8 @@ Requirements:
 
 Build with CMake:
 -----------------
-  CMake is a configure tool which allows you to out-of-source build
-  Requires CMake newer than 2.8.8
+  CMake is a configure tool which allows you to out-of-source build. 
+  LLVM-Tracer Requires CMake newer than 2.8.8
 
   1. Set `LLVM_HOME` to where you installed LLVM
      ```
@@ -35,8 +35,8 @@ Build with CMake:
 
   3. (Optional) Try running triad example, which is built by CMake.
      ```
-     cd /path/to/build/LLVM-Tracer/example/triad
-     ./triad-instrumented
+     cd /path/to/build/LLVM-Tracer/
+     ctest -V
      ```
 
   4. Available CMake settings
