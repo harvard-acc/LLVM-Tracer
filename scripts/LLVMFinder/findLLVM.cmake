@@ -35,7 +35,7 @@ FUNCTION(FIND_LLVM_CONFIG_EXE_OR_AUTOINSTALL LLVM_ROOT LLVM_RECOMMAND_VERSION
       message(FATAL_ERROR "\tfinds no LLVM in your system.\n"
       	"\tPlease manually install LLVM.\n"
       	"\tOr\n"
-      	"\t\"cmake /where/pinavm -DAUTOINSTALL=TRUE\n"
+      	"\t\"cmake /where/LLVM-Tracer -DAUTOINSTALL=TRUE\n"
 	"\t\t-DLLVM_ROOT=/where/you/want/llvm/install/to\"\n"
       	"\twhich should automatically install LLVM for you"
       	" during cmake time.")
@@ -102,7 +102,7 @@ FUNCTION(LOAD_LLVM_SETTINGS LLVM_CONFIG_EXE NEED_LLVM_LIB_ARG)
     if(NOT ${LLVM_FOUND})
       message(FATAL_ERROR "(${LLVM_ROOT}) is not a valid LLVM install\n"
 		  "You can explicitly specify your llvm_root by\n"
-		  "\"cmake /where/pinavm/is -DLLVM_ROOT=/my/llvm/install/dir\"\n"
+		  "\"cmake /where/LLVM-Tracer/is -DLLVM_ROOT=/my/llvm/install/dir\"\n"
 		  "or make llvm-config visible in $PATH")
     endif()
   endif()

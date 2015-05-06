@@ -1,7 +1,8 @@
-# In two-number form only. PinaVM will determine the patch version for you.
+# In two-number form only. LLVM-Tracer will determine the patch version for you.
 SET(LLVM_RECOMMAND_VERSION 3.5)
 
-# TODO the llvm libraries which PinaVM need.
+# TODO : not used now
+# the llvm libraries which the executable need.
 SET(NEED_LLVM_LIB mcjit native bitwriter jit interpreter
 		nativecodegen linker irreader)
 
@@ -10,7 +11,7 @@ SET(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -Wall -W -Wno-unused-parameter
 STRING(REPLACE ";" " " CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
 # sets debug level to g3, which contains more infomation than g2.
-# to use it : cmake /pinavm/source/ -DCMAKE_BUILD_TYPE=DEBUG
+# to use it : cmake /where/source/code -DCMAKE_BUILD_TYPE=DEBUG
 set(CMAKE_CXX_FLAGS_DEBUG -g3)
 
 
