@@ -43,4 +43,5 @@ function(build_tracer_bitcode TEST_NAME f_SRC WORKLOAD)
   add_custom_target(${TARGET_NAME} ALL DEPENDS ${PROFILE_EXE})
   add_dependencies(${TARGET_NAME} PROFILE_FUNC full_trace)
 
+  add_test(NAME ${TEST_NAME} COMMAND ${PROFILE_EXE})
 endfunction(build_tracer_bitcode)
