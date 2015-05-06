@@ -6,7 +6,7 @@
 #    LLVMC_FLAGS
 #    LLVM_OPT_FLAGS
 
-SET(LLVM_EXT bc)
+SET(LLVM_EXT llvm)
 
 macro(collect_included_headers f_abso_temp_src)
   # collect the header dependency of source code.
