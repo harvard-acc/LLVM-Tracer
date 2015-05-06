@@ -21,19 +21,22 @@ endif()
 
 SET(RECOMMAND_LLVM_PREFIX ${CMAKE_BINARY_DIR}/lib/llvm-${LLVM_RECOMMAND_VERSION})
 
+if(NOT DEFINED AUTOINSTALL)
+  SET(AUTOINSTALL FALSE)
+endif()
+
 if(DEFINED LLVM_ROOT)
   get_filename_component(LLVM_ROOT ${LLVM_ROOT} ABSOLUTE)
 elseif("$ENV{LLVM_HOME}" STREQUAL "")
   set(LLVM_ROOT ${RECOMMAND_LLVM_PREFIX})
 else()
+  if(${AUTOINSTALL})
+    message(FATAL_ERROR "please specify LLVM_ROOT explicitly if you ready want to autoinstall LLVM")
+  endif()
   set(LLVM_ROOT "$ENV{LLVM_HOME}")
 endif()
 
 message(STATUS "use LLVM_ROOT : ${LLVM_ROOT}")
-
-if(NOT DEFINED AUTOINSTALL)
-  SET(AUTOINSTALL FALSE)
-endif()
 
 if(NOT DEFINED GEN_HEADER_DEPENDENCY)
   SET(GEN_HEADER_DEPENDENCY FALSE)
