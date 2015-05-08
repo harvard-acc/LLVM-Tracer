@@ -88,8 +88,8 @@ FUNCTION(LOAD_LLVM_SETTINGS LLVM_CONFIG_EXE NEED_LLVM_LIB_ARG)
 		OUTPUT_VARIABLE LLVM_ROOT
                 OUTPUT_STRIP_TRAILING_WHITESPACE )
 
-  get_filename_component(LLVM_BIN_DIR ${LLVM_CONFIG_EXE} DIRECTORY)
-  get_filename_component(LLVM_ROOT ${LLVM_BIN_DIR} DIRECTORY)
+  get_filename_component(LLVM_BIN_DIR ${LLVM_CONFIG_EXE} PATH)
+  get_filename_component(LLVM_ROOT ${LLVM_BIN_DIR} PATH)
 
   # try to load the CMake module of LLVM.
   loadLLVMModule(${LLVM_ROOT} ${NEED_LLVM_LIB_ARG})

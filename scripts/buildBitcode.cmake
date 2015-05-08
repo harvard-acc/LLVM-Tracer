@@ -35,7 +35,7 @@ macro(build_llvm_bc_object f_temp_src)
       	   f_temp_object ${f_temp_object})
 
   # In case that the corresponding directory of binary_dir does not exist.
-  get_filename_component(f_temp_object_dir ${f_temp_object} DIRECTORY)
+  get_filename_component(f_temp_object_dir ${f_temp_object} PATH)
   if(NOT EXISTS ${f_temp_object_dir})
      file(MAKE_DIRECTORY ${f_temp_object_dir})
   endif()
