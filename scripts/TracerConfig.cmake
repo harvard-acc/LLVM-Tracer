@@ -1,5 +1,7 @@
 # In two-number form only. LLVM-Tracer will determine the patch version for you.
-SET(LLVM_RECOMMAND_VERSION 3.5)
+if(NOT DEFINED LLVM_RECOMMAND_VERSION)
+  SET(LLVM_RECOMMAND_VERSION 3.4)
+endif()
 
 # TODO : not used now
 # the llvm libraries which the executable need.

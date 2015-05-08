@@ -106,9 +106,16 @@ struct full_traceImpl {
 
     DebugInfoFinder Finder;
     Finder.processModule(M);
-    for (auto i = Finder.subprograms().begin(),
-              e = Finder.subprograms().end();
-         i != e; ++i) {
+
+    #if (LLVM_VERSION == 34)
+      auto it = Finder.subprogram_begin();
+      auto eit = Finder.subprogram_end();
+    #elif (LLVM_VERSION == 35)
+      auto it = Finder.subprograms().begin();
+      auto eit = Finder.subprograms().end();
+    #endif
+
+    for (auto i = it; i != eit; ++i) {
       DISubprogram S(*i);
       mangled_to_original_name[S.getLinkageName().str()] = S.getName().str();
     }

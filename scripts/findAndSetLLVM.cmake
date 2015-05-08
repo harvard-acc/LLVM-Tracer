@@ -24,6 +24,11 @@ set(LLVM_OPT_FLAGS )
 include_directories( ${LLVM_INCLUDE_DIRS} )
 link_directories( ${LLVM_LIBRARY_DIRS} )
 add_definitions( ${LLVM_DEFINITIONS} )
+
+# remove the dot of LLVM_VERSION and pass it as macro
+string(REPLACE "." "" LLVM_NO_DOT_VERSION "${LLVM_RECOMMAND_VERSION}")
+add_definitions("-DLLVM_VERSION=${LLVM_NO_DOT_VERSION}")
+
 # probably some llvm-config work to do...
 SET(REQ_LLVM_LIBRARIES ${LLVM_LIBS})
 
