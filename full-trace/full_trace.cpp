@@ -27,6 +27,7 @@ class type_info;
 #define FORWARD_LINE 24601
 #define DMA_STORE 98
 #define DMA_LOAD 99
+char s_phi[] = "phi";
 using namespace llvm;
 using namespace std;
 
@@ -228,7 +229,7 @@ struct fullTrace : public BasicBlockPass {
                                   int datasize, int datatype = 64,
                                   bool is_reg = 0, char *reg_id = NULL,
                                   Value *value = NULL, bool is_phi = 0,
-                                  char *prev_bbid = "phi") {
+                                  char *prev_bbid = s_phi) {
     IRBuilder<> IRB(itr);
     Value *v_line = ConstantInt::get(IRB.getInt64Ty(), line);
     Value *v_size = ConstantInt::get(IRB.getInt64Ty(), datasize);
@@ -269,7 +270,7 @@ struct fullTrace : public BasicBlockPass {
   void print_line(BasicBlock::iterator itr, int line, int line_number,
                   char *func_or_reg_id, char *bbID, char *instID, int opty,
                   int datasize = 0, Value *value = NULL, bool is_reg = 0,
-                  char *prev_bbid = "phi") {
+                  char *prev_bbid = s_phi) {
 
     /*Print instruction line*/
     if (line == 0) {
@@ -393,26 +394,26 @@ struct fullTrace : public BasicBlockPass {
               is_reg = getInstId(I, NULL, operR, flag);
               assert(flag == 0);
               if (curr_operand->getType()->isVectorTy()) {
-                print_line(insertp, i + 1, -1, operR, "phi", NULL,
+                print_line(insertp, i + 1, -1, operR, s_phi, NULL,
                            curr_operand->getType()->getTypeID(),
                            getMemSize(curr_operand->getType()), NULL, is_reg,
                            prev_bbid);
               } else {
-                print_line(insertp, i + 1, -1, operR, "phi", NULL,
+                print_line(insertp, i + 1, -1, operR, s_phi, NULL,
                            I->getType()->getTypeID(), getMemSize(I->getType()),
                            NULL, is_reg, prev_bbid);
               }
             } else if (curr_operand->getType()->isVectorTy()) {
               char operand_id[256];
               strcpy(operand_id, curr_operand->getName().str().c_str());
-              print_line(insertp, i + 1, -1, operand_id, "phi", NULL,
+              print_line(insertp, i + 1, -1, operand_id, s_phi, NULL,
                          curr_operand->getType()->getTypeID(),
                          getMemSize(curr_operand->getType()), NULL, is_reg,
                          prev_bbid);
             } else {
               char operand_id[256];
               strcpy(operand_id, curr_operand->getName().str().c_str());
-              print_line(insertp, i + 1, -1, operand_id, "phi", NULL,
+              print_line(insertp, i + 1, -1, operand_id, s_phi, NULL,
                          curr_operand->getType()->getTypeID(),
                          getMemSize(curr_operand->getType()), curr_operand,
                          is_reg, prev_bbid);
