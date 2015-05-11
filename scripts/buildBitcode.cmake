@@ -30,15 +30,16 @@ endmacro(collect_included_headers)
 
 macro(build_llvm_bc_object f_temp_src)
   get_filename_component(f_abso_temp_src ${f_temp_src} ABSOLUTE)
+  get_filename_component(f_file_ext ${f_temp_src} EXT)
 
-  # cpp -> obj.bc
-  STRING(REPLACE ".cpp" ".obj.${LLVM_EXT}" f_temp_object ${f_abso_temp_src})
+  # file extension(.cpp .c) -> obj.bc
+  STRING(REPLACE "${f_file_ext}" ".obj.${LLVM_EXT}" f_temp_object ${f_abso_temp_src})
   # source_dir -> binary_dir
   STRING(REPLACE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} 
       	   f_temp_object ${f_temp_object})
 
   # In case that the corresponding directory of binary_dir does not exist.
-  get_filename_component(f_temp_object_dir ${f_temp_object} PATH)
+  get_filename_component(f_temp_object_dir ${f_temp_object} DIRECTORY)
   if(NOT EXISTS ${f_temp_object_dir})
      file(MAKE_DIRECTORY ${f_temp_object_dir})
   endif()
