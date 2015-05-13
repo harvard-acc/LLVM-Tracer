@@ -48,7 +48,10 @@ Build with CMake:
 
      -DAUTOINSTALL=TRUE
        By this option, CMake scripts will automatically download, build and
-       install LLVM for you if finds no LLVM installation.
+       install LLVM for you if finds no LLVM installation. Using this
+       function requires tar-1.22 or newer to extract xz format. The default
+       installation path is under /your/build_dir/lib/llvm-3.x. You can
+       manually define the installation path by -DLLVM_ROOT=/where/to/install
 
      -DCMAKE_BUILD_TYPE=None,Debug,Release
        You can choose one from three of bulid types.
