@@ -14,12 +14,15 @@ International Symposium on Performance Analysis of Systems and Software
 ============================================
 Requirements:
 -------------------
+  LLVM 3.4 and Clang 3.4 64-bit
+  or
   LLVM 3.5 and Clang 3.5 64-bit
 
 Build with CMake:
 -----------------
   CMake is a configure tool which allows you to out-of-source build. 
-  LLVM-Tracer Requires CMake newer than 2.8.12
+  LLVM-Tracer Requires CMake newer than 2.8.12. By default, CMake
+  searches for LLVM 3.4.
 
   1. Set `LLVM_HOME` to where you installed LLVM
      ```
@@ -45,6 +48,10 @@ Build with CMake:
        You may denote the path of LLVM to find/install by this option. if
        this option is not defined, environment variable LLVM_HOME will be
        used.
+
+     -DLLVM_RECOMMAND_VERSION="3.4", "3.5"
+       LLVM-Tracer supports both LLVM 3.4 and 3.5. It uses LLVM 3.4 by
+       default, but you can manually specify the LLVM version to use.
 
      -DAUTOINSTALL=TRUE
        By this option, CMake scripts will automatically download, build and
