@@ -58,11 +58,15 @@ macro(build_llvm_bc_object f_temp_src)
   LIST(APPEND f_objects ${f_temp_object})
 endmacro(build_llvm_bc_object)
 
-function(build_llvm_bitcode f_target_name f_src_list)
+function(build_llvm_bc f_target_name f_src_list f_target_directory)
   set(f_target_unopt_file
              ${CMAKE_CURRENT_BINARY_DIR}/${f_target_name}.unopt.${LLVM_EXT})
 
-  set(f_target_file ${CMAKE_CURRENT_BINARY_DIR}/${f_target_name}.${LLVM_EXT})
+  if (${f_target_directory} STREQUAL "")
+    message(FATAL_ERROR "unknown target directory")
+  endif()
+
+  set(f_target_file ${f_target_directory}/${f_target_name}.${LLVM_EXT})
 
   # for each .cpp file, LLVMC would generate .obj.bc file in binary dir.
   foreach(f_temp_src ${${f_src_list}})
@@ -81,4 +85,8 @@ function(build_llvm_bitcode f_target_name f_src_list)
     VERBATIM)
 
   add_custom_target(${f_target_name} DEPENDS ${f_target_file})
+endfunction(build_llvm_bc)
+
+function(build_llvm_bitcode f_target_name f_src_list)
+  build_llvm_bc(${f_target_name} ${f_src_list} ${CMAKE_CURRENT_BINARY_DIR})
 endfunction(build_llvm_bitcode)

@@ -80,6 +80,12 @@ Build with CMake:
 
      -DCMAKE_BUILD_TYPE=None,Debug,Release
        You can choose one from three of bulid types.
+
+     -DBUILD_ON_SOURCE=TRUE
+       By assign this option, CMake will build fulltrace.so &
+       trace_logger.llvm under the source directory.
+       Other llvm bitcode and object files still remain in the build directory.
+       
      ```
 
 Build with Makefile:
