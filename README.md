@@ -30,9 +30,20 @@ Build with CMake:
      ```
 
   2. configure with CMake and build LLVM-Tracer source code
+
+     If you have LLVM installed :
      ```
+     mkdir /path/to/build/LLVM-Tracer/
      cd /path/to/build/LLVM-Tracer/
      cmake /path/to/LLVM-Tracer/
+     make
+     ```
+
+     If you want CMake to install LLVM for you. CAUTION : takes an hour!
+     ```
+     mkdir /path/to/build/LLVM-Tracer/
+     cd /path/to/build/LLVM-Tracer/
+     cmake /path/to/LLVM-Tracer/ -DLLVM_ROOT=/where/to/install/LLVM -DAUTOINSTALL=TRUE
      make
      ```
 
