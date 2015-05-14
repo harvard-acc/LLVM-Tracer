@@ -35,7 +35,7 @@ FUNCTION(loadLLVMModule LLVM_ROOT NEED_LLVM_LIB_LIST)
   find_package(LLVM QUIET)
 
   if(${LLVM_FOUND})
-    if(${LLVM_RECOMMAND_VERSION} VERSION_LESS 3.5)
+    if(${LLVM_RECOMMEND_VERSION} VERSION_LESS 3.5)
       llvm_map_components_to_libraries(LLVM_LIBS ${NEED_LLVM_LIB})
     else()
       llvm_map_components_to_libnames(LLVM_LIBS ${NEED_LLVM_LIB})

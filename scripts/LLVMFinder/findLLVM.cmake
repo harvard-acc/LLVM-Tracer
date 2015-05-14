@@ -5,31 +5,31 @@ set(AUTOINSTALLER_DIR ${SCRIPT_DIR}/AutoInstaller)
 include(${AUTOINSTALLER_DIR}/installLLVM.cmake)
 
 # find llvm-config. perfers to the one with version suffix, Ex:llvm-config-3.2
-FUNCTION(find_LLVM_CONFIG_EXE LLVM_ROOT LLVM_RECOMMAND_VERSION)
+FUNCTION(find_LLVM_CONFIG_EXE LLVM_ROOT LLVM_RECOMMEND_VERSION)
   find_program(LLVM_CONFIG_EXE
   # TODO add PATCH version?
-  NAMES "${LLVM_ROOT}/bin/llvm-config-${LLVM_RECOMMAND_VERSION}"
+  NAMES "${LLVM_ROOT}/bin/llvm-config-${LLVM_RECOMMEND_VERSION}"
         "${LLVM_ROOT}/bin/llvm-config"
-        "llvm-config-${LLVM_RECOMMAND_VERSION}"
+        "llvm-config-${LLVM_RECOMMEND_VERSION}"
         "llvm-config"
 	)
   set(LLVM_CONFIG_EXE ${LLVM_CONFIG_EXE} PARENT_SCOPE)
 ENDFUNCTION(find_LLVM_CONFIG_EXE)
 
 # this function sets LLVM_CONFIG_EXE
-FUNCTION(FIND_LLVM_CONFIG_EXE_OR_AUTOINSTALL LLVM_ROOT LLVM_RECOMMAND_VERSION
+FUNCTION(FIND_LLVM_CONFIG_EXE_OR_AUTOINSTALL LLVM_ROOT LLVM_RECOMMEND_VERSION
                   AUTOINSTALL)
   # this function set LLVM_CONFIG_EXE
-  find_LLVM_CONFIG_EXE(${LLVM_ROOT} ${LLVM_RECOMMAND_VERSION})
+  find_LLVM_CONFIG_EXE(${LLVM_ROOT} ${LLVM_RECOMMEND_VERSION})
 
   # In case of finds no LLVM, give user a hint to install LLVM
   if(${LLVM_CONFIG_EXE} STREQUAL "LLVM_CONFIG_EXE-NOTFOUND")
     if(${AUTOINSTALL})
       # if AUTOINSTALL is explicitly set to true, then run installLLVM.
-      autoinstall_llvm(${LLVM_RECOMMAND_VERSION} ${LLVM_ROOT}
+      autoinstall_llvm(${LLVM_RECOMMEND_VERSION} ${LLVM_ROOT}
                      "${CMAKE_BINARY_DIR}/autoinstaller")
       set(AUTOINSTALL FALSE)
-      find_LLVM_CONFIG_EXE(${LLVM_ROOT} ${LLVM_RECOMMAND_VERSION})
+      find_LLVM_CONFIG_EXE(${LLVM_ROOT} ${LLVM_RECOMMEND_VERSION})
     else()
       # on condition that finds no LLVM and user not specify AUTOINSTALL.
       message(FATAL_ERROR "\tfinds no LLVM in your system.\n"
@@ -47,7 +47,7 @@ ENDFUNCTION(FIND_LLVM_CONFIG_EXE_OR_AUTOINSTALL)
 
 # this function sets LLVM_CONFIG_EXE
 FUNCTION(CHECK_LLVM_CONFIG_VERSION_OR_AUTOINSTALL LLVM_ROOT
-                      LLVM_RECOMMAND_VERSION LLVM_CONFIG_EXE)
+                      LLVM_RECOMMEND_VERSION LLVM_CONFIG_EXE)
   message(STATUS "find LLVM-Config : ${LLVM_CONFIG_EXE}")
   execute_process(COMMAND ${LLVM_CONFIG_EXE} --version
 		OUTPUT_VARIABLE LLVM_VERSION
@@ -55,18 +55,18 @@ FUNCTION(CHECK_LLVM_CONFIG_VERSION_OR_AUTOINSTALL LLVM_ROOT
 
 
   # Check whether the LLVM version meets our requirement.
-  if(${LLVM_VERSION} MATCHES ^${LLVM_RECOMMAND_VERSION})
+  if(${LLVM_VERSION} MATCHES ^${LLVM_RECOMMEND_VERSION})
     message(STATUS "LLVM version : ${LLVM_VERSION}")
   else()
     if(${AUTOINSTALL})
       # if AUTOINSTALL is explicitly set to true, then run installLLVM.
-      autoinstall_llvm(${LLVM_RECOMMAND_VERSION} ${LLVM_ROOT}
+      autoinstall_llvm(${LLVM_RECOMMEND_VERSION} ${LLVM_ROOT}
                      "${CMAKE_BINARY_DIR}/autoinstaller")
       set(AUTOINSTALL FALSE)
-      find_LLVM_CONFIG_EXE(${LLVM_ROOT} ${LLVM_RECOMMAND_VERSION})
+      find_LLVM_CONFIG_EXE(${LLVM_ROOT} ${LLVM_RECOMMEND_VERSION})
     else()
       message(FATAL_ERROR "LLVM version is recommanded to be : "
-         "${LLVM_RECOMMAND_VERSION}\n"
+         "${LLVM_RECOMMEND_VERSION}\n"
          "Your current version is ${LLVM_VERSION}")
     endif()
   endif()
@@ -124,14 +124,14 @@ ENDFUNCTION(LOAD_LLVM_SETTINGS)
 # LLVM_INCLUDE_DIRS
 # LLVM_LIBRARY_DIRS
 
-FUNCTION(FIND_LLVM LLVM_ROOT LLVM_RECOMMAND_VERSION NEED_LLVM_LIB_ARG
+FUNCTION(FIND_LLVM LLVM_ROOT LLVM_RECOMMEND_VERSION NEED_LLVM_LIB_ARG
          AUTOINSTALL)
   # this function sets LLVM_CONFIG_EXE
-  FIND_LLVM_CONFIG_EXE_OR_AUTOINSTALL(${LLVM_ROOT} ${LLVM_RECOMMAND_VERSION}
+  FIND_LLVM_CONFIG_EXE_OR_AUTOINSTALL(${LLVM_ROOT} ${LLVM_RECOMMEND_VERSION}
                     ${AUTOINSTALL})
   # this function sets LLVM_CONFIG_EXE
   CHECK_LLVM_CONFIG_VERSION_OR_AUTOINSTALL(${LLVM_ROOT}
-                        ${LLVM_RECOMMAND_VERSION} ${LLVM_CONFIG_EXE})
+                        ${LLVM_RECOMMEND_VERSION} ${LLVM_CONFIG_EXE})
   LOAD_LLVM_SETTINGS(${LLVM_CONFIG_EXE} ${NEED_LLVM_LIB_ARG})
   set(LLVM_ROOT ${LLVM_ROOT} PARENT_SCOPE)
   set(LLVM_LIBS ${LLVM_LIBS} PARENT_SCOPE)

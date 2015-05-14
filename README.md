@@ -49,7 +49,7 @@ Build with CMake:
        this option is not defined, environment variable LLVM_HOME will be
        used.
 
-     -DLLVM_RECOMMAND_VERSION="3.4", "3.5"
+     -DLLVM_RECOMMEND_VERSION="3.4", "3.5"
        LLVM-Tracer supports both LLVM 3.4 and 3.5. It uses LLVM 3.4 by
        default, but you can manually specify the LLVM version to use.
 

@@ -10,7 +10,7 @@ include(${SCRIPT_DIR}/buildTracerBitcode.cmake)
 # LLVM_DEFINITIONS
 # LLVM_INCLUDE_DIRS
 # LLVM_LIBRARY_DIRS
-FIND_LLVM(${LLVM_ROOT} ${LLVM_RECOMMAND_VERSION} NEED_LLVM_LIB ${AUTOINSTALL})
+FIND_LLVM(${LLVM_ROOT} ${LLVM_RECOMMEND_VERSION} NEED_LLVM_LIB ${AUTOINSTALL})
 findLLVMTool(LLVM_LINK "llvm-link")
 findLLVMTool(LLVM_OPT "opt")
 findLLVMTool(LLVM_LLC "llc")
@@ -26,7 +26,7 @@ link_directories( ${LLVM_LIBRARY_DIRS} )
 add_definitions( ${LLVM_DEFINITIONS} )
 
 # remove the dot of LLVM_VERSION and pass it as macro
-string(REPLACE "." "" LLVM_NO_DOT_VERSION "${LLVM_RECOMMAND_VERSION}")
+string(REPLACE "." "" LLVM_NO_DOT_VERSION "${LLVM_RECOMMEND_VERSION}")
 add_definitions("-DLLVM_VERSION=${LLVM_NO_DOT_VERSION}")
 
 # probably some llvm-config work to do...

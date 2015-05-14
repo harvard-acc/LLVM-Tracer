@@ -1,7 +1,7 @@
-FUNCTION(findLLVMTool_Fct var_name tool_name LLVM_ROOT LLVM_RECOMMAND_VERSION)
+FUNCTION(findLLVMTool_Fct var_name tool_name LLVM_ROOT LLVM_RECOMMEND_VERSION)
   set(LLVM_BIN_DIR "${LLVM_ROOT}/bin")
   find_program(${var_name}
-  NAMES "${LLVM_BIN_DIR}/${tool_name}-${LLVM_RECOMMAND_VERSION}"
+  NAMES "${LLVM_BIN_DIR}/${tool_name}-${LLVM_RECOMMEND_VERSION}"
         "${LLVM_BIN_DIR}/${tool_name}")
 
   if(${${var_name}} STREQUAL "${var_name}-NOTFOUND")
@@ -14,5 +14,5 @@ FUNCTION(findLLVMTool_Fct var_name tool_name LLVM_ROOT LLVM_RECOMMAND_VERSION)
 ENDFUNCTION(findLLVMTool_Fct)
 
 macro(findLLVMTool var_name tool_name)
-  findLLVMTool_Fct(${var_name} ${tool_name} ${LLVM_ROOT} ${LLVM_RECOMMAND_VERSION})
+  findLLVMTool_Fct(${var_name} ${tool_name} ${LLVM_ROOT} ${LLVM_RECOMMEND_VERSION})
 endmacro(findLLVMTool)

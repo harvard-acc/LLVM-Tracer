@@ -48,31 +48,31 @@ MACRO(find_xz TAR_EXE)
   endif()
 ENDMACRO()
 
-MACRO(llvm_install_assert_arg LLVM_RECOMMAND_VERSION_ARG LLVM_ROOT_ARG)
+MACRO(llvm_install_assert_arg LLVM_RECOMMEND_VERSION_ARG LLVM_ROOT_ARG)
   if (${LLVM_ROOT_ARG} STREQUAL "")
     message(FATAL_ERROR "LLVM_ROOT empty")
   endif()
 
-  if (${LLVM_RECOMMAND_VERSION_ARG} STREQUAL "")
+  if (${LLVM_RECOMMEND_VERSION_ARG} STREQUAL "")
     message(FATAL_ERROR "LLVM_VERSION empty")
   endif()
 
-  string(REPLACE "." ";" version_list "${LLVM_RECOMMAND_VERSION_ARG}")
+  string(REPLACE "." ";" version_list "${LLVM_RECOMMEND_VERSION_ARG}")
   list(LENGTH version_list version_len)
 
   if(NOT (${version_len} EQUAL 2))
     message(FATAL_ERROR "only accept LLVM_VERSION in X.Y form")
   endif()
 
-  if (${LLVM_RECOMMAND_VERSION_ARG} VERSION_LESS 3.1)
+  if (${LLVM_RECOMMEND_VERSION_ARG} VERSION_LESS 3.1)
     message(FATAL_ERROR "Only Support LLVM version > 3.0, your version : "
-                         "${LLVM_RECOMMAND_VERSION_ARG}")
+                         "${LLVM_RECOMMEND_VERSION_ARG}")
   endif()
 ENDMACRO()
 
 MACRO(configure_autoinstall AUTOINSTALL_DIR)
   # sets the md5 checksum for certain version.
-  decide_patch_version(${LLVM_RECOMMAND_VERSION_ARG})
+  decide_patch_version(${LLVM_RECOMMEND_VERSION_ARG})
   set_llvm_md5()
   find_tar()
 
@@ -86,7 +86,7 @@ MACRO(configure_autoinstall AUTOINSTALL_DIR)
 
   SET(DOWNLOAD_DIR ${AUTOINSTALL_DIR}/download)
 
-  if (${LLVM_RECOMMAND_VERSION_ARG} VERSION_LESS "3.5")
+  if (${LLVM_RECOMMEND_VERSION_ARG} VERSION_LESS "3.5")
     SET(URL_SUFFIX src.tar.gz)
     SET(COMPRESS_OPTION gzip)
   else()
@@ -95,7 +95,7 @@ MACRO(configure_autoinstall AUTOINSTALL_DIR)
     find_xz(${TAR_EXE})
   endif()
 
-  if (${LLVM_RECOMMAND_VERSION_ARG} VERSION_LESS "3.3")
+  if (${LLVM_RECOMMEND_VERSION_ARG} VERSION_LESS "3.3")
     SET(CLANG_NAME_SHORT clang)
   else()
     SET(CLANG_NAME_SHORT cfe)
@@ -236,7 +236,7 @@ MACRO(check_llvm_version)
 		OUTPUT_STRIP_TRAILING_WHITESPACE)
 
   # Check whether the LLVM version meets our requirement.
-  if(${LLVM_VERSION} MATCHES ^${LLVM_RECOMMAND_VERSION_ARG})
+  if(${LLVM_VERSION} MATCHES ^${LLVM_RECOMMEND_VERSION_ARG})
     # set LLVM_CONFIG_EXE for parent, so that not to find it in parent
     # process again.
     set(LLVM_CONFIG_EXE ${llvm-config-temp} PARENT_SCOPE)
@@ -249,13 +249,13 @@ ENDMACRO()
 
 
 
-FUNCTION(autoinstall_llvm LLVM_RECOMMAND_VERSION_ARG LLVM_ROOT_ARG AUTOINSTALL_DIR_ARG)
+FUNCTION(autoinstall_llvm LLVM_RECOMMEND_VERSION_ARG LLVM_ROOT_ARG AUTOINSTALL_DIR_ARG)
   if (NOT DEFINED TEST_CMAKE)
     set(TEST_CMAKE false)
   endif()
 
   # check whether llvm version bigger 3.1
-  llvm_install_assert_arg(${LLVM_RECOMMAND_VERSION_ARG} ${LLVM_ROOT_ARG})
+  llvm_install_assert_arg(${LLVM_RECOMMEND_VERSION_ARG} ${LLVM_ROOT_ARG})
   configure_processor_count()
 
   configure_autoinstall(${AUTOINSTALL_DIR_ARG})
