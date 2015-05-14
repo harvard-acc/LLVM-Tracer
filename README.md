@@ -19,7 +19,7 @@ Requirements:
 Build with CMake:
 -----------------
   CMake is a configure tool which allows you to out-of-source build. 
-  LLVM-Tracer Requires CMake newer than 2.8.8
+  LLVM-Tracer Requires CMake newer than 2.8.12
 
   1. Set `LLVM_HOME` to where you installed LLVM
      ```
