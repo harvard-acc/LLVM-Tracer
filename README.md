@@ -55,16 +55,16 @@ Build with CMake:
 
   4. Available CMake settings
      ```
-     -DLLVM_ROOT=/where/your/llvm/install
+     -DLLVM_ROOT=/where/your/llvm/install   (default : $LLVM_HOME)
        You may denote the path of LLVM to find/install by this option. if
        this option is not defined, environment variable LLVM_HOME will be
        used.
 
-     -DLLVM_RECOMMEND_VERSION="3.4", "3.5"
+     -DLLVM_RECOMMEND_VERSION="3.4", "3.5"    (default : 3.4)
        LLVM-Tracer supports both LLVM 3.4 and 3.5. It uses LLVM 3.4 by
        default, but you can manually specify the LLVM version to use.
 
-     -DAUTOINSTALL=TRUE
+     -DAUTOINSTALL=TRUE,FALSE    (default : FALSE)
        By this option, CMake scripts will automatically download, build and
        install LLVM for you if finds no LLVM installation. Using this
        function requires tar-1.22 or newer to extract xz format.
@@ -76,12 +76,12 @@ Build with CMake:
        The default installation version will be 3.4. You can define
        the installation version by -DLLVM_RECOMMEND_VERSION="3.5" or "3.4".
        This auto install script will try to use the latest patch version
-       according to scripts/AutoInstall/LLVMPatchVersion.cmake
+       according to cmake-scripts/AutoInstall/LLVMPatchVersion.cmake
 
-     -DCMAKE_BUILD_TYPE=None,Debug,Release
+     -DCMAKE_BUILD_TYPE=None,Debug,Release    (default : None)
        You can choose one from three of bulid types.
 
-     -DBUILD_ON_SOURCE=TRUE
+     -DBUILD_ON_SOURCE=TRUE,FALSE    (default : FALSE)
        By assign this option, CMake will build fulltrace.so &
        trace_logger.llvm under the source directory.
        Other llvm bitcode and object files still remain in the build directory.
