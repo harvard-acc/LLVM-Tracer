@@ -18,6 +18,23 @@ Requirements:
   or
   LLVM 3.5 and Clang 3.5 64-bit
 
+
+Build:
+-----------------
+  LLVM-Tracer currently supports two ways to build.
+
+  1. Configure with CMake, then build with Make :
+
+       If you are familiar with CMake, or you are interested in a script
+       which can build out-of-source and offer automatical LLVM/Clang
+       installation, choose [CMake](#build-with-cmake)
+
+  2. Directly build with Makefile :
+
+       If you want to keep all the things simple, or you do not have
+       CMake, choose [Makefile](#build-with-makefile)
+
+
 Build with CMake:
 -----------------
   CMake is a configure tool which allows you to out-of-source build. 
@@ -29,7 +46,7 @@ Build with CMake:
      export $LLVM_HOME=/path/to/your/llvm/installation
      ```
 
-  2. configure with CMake and build LLVM-Tracer source code
+  2. Configure with CMake and build LLVM-Tracer source code
 
      If you have LLVM installed :
      ```
