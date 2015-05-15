@@ -41,6 +41,10 @@ Build with CMake:
   LLVM-Tracer Requires CMake newer than 2.8.12. By default, CMake
   searches for LLVM 3.4.
 
+  Note : In order to being compatiable with legacy work flow,
+  CMake will bulid full-trace/full\_trace.so & profile-func/trace\_logger.llvm
+  under source directory. To turn off, -DBUILD\_ON\_SOURCE=FALSE
+
   1. Set `LLVM_HOME` to where you installed LLVM
      ```
      export $LLVM_HOME=/path/to/your/llvm/installation
@@ -98,7 +102,7 @@ Build with CMake:
      -DCMAKE_BUILD_TYPE=None,Debug,Release    (default : None)
        You can choose one from three of bulid types.
 
-     -DBUILD_ON_SOURCE=TRUE,FALSE    (default : FALSE)
+     -DBUILD_ON_SOURCE=TRUE,FALSE    (default : TRUE)
        By assign this option, CMake will build fulltrace.so &
        trace_logger.llvm under the source directory.
        Other llvm bitcode and object files still remain in the build directory.
