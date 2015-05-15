@@ -14,10 +14,104 @@ International Symposium on Performance Analysis of Systems and Software
 ============================================
 Requirements:
 -------------------
-  LLVM 3.4.0 and Clang 3.4.0 64-bit
+  LLVM 3.4 and Clang 3.4 64-bit
+  or
+  LLVM 3.5 and Clang 3.5 64-bit
+
 
 Build:
-------
+-----------------
+  LLVM-Tracer currently supports two ways to build.
+
+  1. Configure with CMake, then build with Make :
+
+       If you are familiar with CMake, or you are interested in a script
+       which can build out-of-source and offer automatical LLVM/Clang
+       installation, choose [CMake](#build-with-cmake)
+
+  2. Directly build with Makefile :
+
+       If you want to keep all the things simple, or you do not have
+       CMake, choose [Makefile](#build-with-makefile)
+
+
+Build with CMake:
+-----------------
+  CMake is a configure tool which allows you to out-of-source build. 
+  LLVM-Tracer Requires CMake newer than 2.8.12. By default, CMake
+  searches for LLVM 3.4.
+
+  Note : In order to being compatiable with legacy work flow,
+  CMake will bulid full-trace/full\_trace.so & profile-func/trace\_logger.llvm
+  under source directory. To turn off, -DBUILD\_ON\_SOURCE=FALSE
+
+  1. Set `LLVM_HOME` to where you installed LLVM
+     ```
+     export $LLVM_HOME=/path/to/your/llvm/installation
+     ```
+
+  2. Configure with CMake and build LLVM-Tracer source code
+
+     If you have LLVM installed :
+     ```
+     mkdir /path/to/build/LLVM-Tracer/
+     cd /path/to/build/LLVM-Tracer/
+     cmake /path/to/LLVM-Tracer/
+     make
+     ```
+
+     If you want CMake to install LLVM for you. CAUTION : takes an hour!
+     ```
+     mkdir /path/to/build/LLVM-Tracer/
+     cd /path/to/build/LLVM-Tracer/
+     cmake /path/to/LLVM-Tracer/ -DLLVM_ROOT=/where/to/install/LLVM -DAUTOINSTALL=TRUE
+     make
+     ```
+
+  3. (Optional) Try running triad example, which is built by CMake.
+     ```
+     cd /path/to/build/LLVM-Tracer/
+     ctest -V
+     ```
+
+  4. Available CMake settings
+     ```
+     -DLLVM_ROOT=/where/your/llvm/install   (default : $LLVM_HOME)
+       You may denote the path of LLVM to find/install by this option. if
+       this option is not defined, environment variable LLVM_HOME will be
+       used.
+
+     -DLLVM_RECOMMEND_VERSION="3.4", "3.5"    (default : 3.4)
+       LLVM-Tracer supports both LLVM 3.4 and 3.5. It uses LLVM 3.4 by
+       default, but you can manually specify the LLVM version to use.
+
+     -DAUTOINSTALL=TRUE,FALSE    (default : FALSE)
+       By this option, CMake scripts will automatically download, build and
+       install LLVM for you if finds no LLVM installation. Using this
+       function requires tar-1.22 or newer to extract xz format.
+
+       The default installation path is under /your/build_dir/lib/llvm-3.x.
+       You can manually define the installation path by
+       -DLLVM_ROOT=/where/to/install.
+
+       The default installation version will be 3.4. You can define
+       the installation version by -DLLVM_RECOMMEND_VERSION="3.5" or "3.4".
+       This auto install script will try to use the latest patch version
+       according to cmake-scripts/AutoInstall/LLVMPatchVersion.cmake
+
+     -DCMAKE_BUILD_TYPE=None,Debug,Release    (default : None)
+       You can choose one from three of bulid types.
+
+     -DBUILD_ON_SOURCE=TRUE,FALSE    (default : TRUE)
+       By assign this option, CMake will build fulltrace.so &
+       trace_logger.llvm under the source directory.
+       Other llvm bitcode and object files still remain in the build directory.
+       
+     ```
+
+Build with Makefile:
+---------------------
+
   1. Set `LLVM_HOME` to where you installed LLVM
      Add LLVM and Clang binary to your PATH:
 

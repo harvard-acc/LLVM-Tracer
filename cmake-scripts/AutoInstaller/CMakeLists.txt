@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 2.8.8)
+
+set(AUTOINSTALLER_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+include(${AUTOINSTALLER_DIR}/installLLVM.cmake)
+autoinstall_llvm(${LLVM_RECOMMAND_VERSION} ${LLVM_ROOT} ${CMAKE_CURRENT_BINARY_DIR})

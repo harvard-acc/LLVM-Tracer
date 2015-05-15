@@ -14,7 +14,7 @@ void trace_logger_log0(int line_number, char *name, char *bbid, char *instid,
 void trace_logger_log_label();
 void trace_logger_fin();
 
-gzFile *full_trace_file;
+gzFile full_trace_file;
 int initp = 0;
 
 int inst_count = 0;

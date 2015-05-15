@@ -4,6 +4,12 @@
 /// This class provides computation of slot numbers for LLVM Assembly writing.
 ///
 
+#if (LLVM_VERSION == 34)
+  #include "llvm/DebugInfo.h"
+#elif (LLVM_VERSION == 35)
+  #include "llvm/IR/DebugInfo.h"
+#endif
+
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallString.h"
@@ -11,10 +17,7 @@
 #include "llvm/Analysis/CFG.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Constants.h"
-#include "llvm/DebugInfo.h"
 #include "llvm/IR/DerivedTypes.h"
-//#include "llvm/IR/IRPrintingPasses.h"
-#include "llvm/Assembly/PrintModulePass.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LLVMContext.h"

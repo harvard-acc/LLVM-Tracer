@@ -1,25 +1,18 @@
-namespace std {
-class type_info;
-}
 #include <vector>
 #include <map>
 #include <cmath>
-#include "llvm/Pass.h"
-#include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Module.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Metadata.h"
-#include "llvm/DebugInfo.h"
 #include <cstring>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
-#include <string>
 #include <set>
 #include <sstream>
 #include "SlotTracker.h"
+#include "full_trace.h"
 
 #define NUM_OF_INTRINSICS 35
 #define NUM_OF_LLVM_INTRINSICS 33
@@ -42,7 +35,6 @@ namespace {
   }
 
 
-}// end of anonymous namespace
 char list_of_intrinsics[NUM_OF_INTRINSICS]
                        [25] = { "llvm.memcpy", // standard C lib
                                 "llvm.memmove", "llvm.memset", "llvm.sqrt",
@@ -64,15 +56,13 @@ char list_of_intrinsics[NUM_OF_INTRINSICS]
                                 "llvm.fmuladd", // specialised arithmetic
                                 "dmaLoad", "dmaStore", };
 
-namespace {
+}// end of anonymous namespace
 
-struct fullTrace : public BasicBlockPass {
-  static char ID;
+struct full_traceImpl {
 
   // External trace_logger function
   Value *TL_log0, *TL_log_int, *TL_log_double;
 
-  fullTrace() : BasicBlockPass(ID) {}
 
   Module *curr_module;
   SlotTracker *st;
@@ -81,7 +71,7 @@ struct fullTrace : public BasicBlockPass {
   std::set<std::string> functions;
   std::map<string, string> mangled_to_original_name;
 
-  virtual bool doInitialization(Module &M) {
+  bool doInitialization(Module &M, std::string func_string) {
     // Add external trace_logger function declaratio
     TL_log0 = M.getOrInsertFunction(
         "trace_logger_log0", Type::getVoidTy(M.getContext()),
@@ -104,7 +94,6 @@ struct fullTrace : public BasicBlockPass {
         Type::getInt8PtrTy((M.getContext())), Type::getInt64Ty(M.getContext()),
         Type::getInt8PtrTy((M.getContext())), NULL);
 
-    std::string func_string = getenv("WORKLOAD");
     if (func_string.empty()) {
       std::cerr << "Please set WORKLOAD as an environment variable!\n";
       return false;
@@ -118,9 +107,16 @@ struct fullTrace : public BasicBlockPass {
 
     DebugInfoFinder Finder;
     Finder.processModule(M);
-    for (DebugInfoFinder::iterator i = Finder.subprogram_begin(),
-                                   e = Finder.subprogram_end();
-         i != e; ++i) {
+
+    #if (LLVM_VERSION == 34)
+      auto it = Finder.subprogram_begin();
+      auto eit = Finder.subprogram_end();
+    #elif (LLVM_VERSION == 35)
+      auto it = Finder.subprograms().begin();
+      auto eit = Finder.subprograms().end();
+    #endif
+
+    for (auto i = it; i != eit; ++i) {
       DISubprogram S(*i);
       mangled_to_original_name[S.getLinkageName().str()] = S.getName().str();
     }
@@ -331,7 +327,7 @@ struct fullTrace : public BasicBlockPass {
       fprintf(stderr, "!!This block does not have a name or a ID!\n");
   }
 
-  virtual bool runOnBasicBlock(BasicBlock &BB) {
+  bool runOnBasicBlock(BasicBlock &BB) {
     Function *func = BB.getParent();
     int instc = 0;
     char funcName[256];
@@ -647,10 +643,39 @@ struct fullTrace : public BasicBlockPass {
     return false;
   }
   // runBasicBlock
-};
-// struct
+}; // end of struct full_traceImpl
 
-} // namespace
+fullTrace::fullTrace() : BasicBlockPass(ID)
+{
+    this->Impl = new full_traceImpl();
+}
+
+fullTrace::~fullTrace()
+{
+    delete this->Impl;
+}
+
+bool fullTrace::doInitialization(Module &M)
+{
+    assert(this->Impl);
+
+    std::string func_string;
+    if (this->my_workload.empty()) {
+      func_string = getenv("WORKLOAD");
+    } else {
+      func_string = this->my_workload;
+    }
+
+    bool ret = this->Impl->doInitialization(M, func_string);
+    return ret;
+}
+bool fullTrace::runOnBasicBlock(BasicBlock &BB)
+{
+    assert(this->Impl);
+    bool ret = this->Impl->runOnBasicBlock(BB);
+    return ret;
+}
+
 
 char fullTrace::ID = 0;
 static RegisterPass<fullTrace>
