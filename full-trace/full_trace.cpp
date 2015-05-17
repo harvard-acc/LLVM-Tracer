@@ -265,8 +265,7 @@ struct full_traceImpl {
     /*Print instruction line*/
     if (line == 0) {
       IRBuilder<> IRB(itr);
-      Value *v_line, *v_opty, *v_value, *v_linenumber;
-      v_line = ConstantInt::get(IRB.getInt64Ty(), line);
+      Value *v_opty, *v_linenumber;
       v_opty = ConstantInt::get(IRB.getInt64Ty(), opty);
       v_linenumber = ConstantInt::get(IRB.getInt64Ty(), line_number);
       Constant *vv_func_id = createStringArg(func_or_reg_id);
@@ -351,7 +350,6 @@ struct full_traceImpl {
 
         Value *curr_operand = NULL;
         bool is_reg = 0;
-        int size = 0;
         char bbid[256], instid[256], operR[256];
         int line_number = -1;
 
@@ -433,7 +431,6 @@ struct full_traceImpl {
     for (BasicBlock::iterator itr = insertp; itr != BB.end(); itr = nextitr) {
       Value *curr_operand = NULL;
       bool is_reg = 0;
-      int size = 0;
       char bbid[256], instid[256], operR[256];
       int line_number = -1;
 
@@ -484,7 +481,6 @@ struct full_traceImpl {
                    getMemSize(curr_operand->getType()), curr_operand, is_reg);
 
         const Function::ArgumentListType &Args(fun->getArgumentList());
-        int num_of_call_operands = CI->getNumArgOperands();
         int call_id = 0;
         for (Function::ArgumentListType::const_iterator arg_it = Args.begin(),
                                                         arg_end = Args.end();
@@ -566,7 +562,6 @@ struct full_traceImpl {
           for (int i = num_of_operands - 1; i >= 0; i--) {
             curr_operand = itr->getOperand(i);
             is_reg = curr_operand->hasName();
-            char arg_label_in_callee[256];
 
             // for instructions using registers
             if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
