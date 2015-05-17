@@ -69,7 +69,6 @@ struct full_traceImpl {
   Function *curr_function;
 
   std::set<std::string> functions;
-  std::map<string, string> mangled_to_original_name;
 
   bool doInitialization(Module &M, std::string func_string) {
     auto &llvm_context = M.getContext();
@@ -92,7 +91,8 @@ struct full_traceImpl {
       std::cerr << "Please set WORKLOAD as an environment variable!\n";
       return false;
     }
-    split(func_string, ',', this->functions);
+    std::set<std::string> user_workloads;
+    split(func_string, ',', user_workloads);
 
     st = createSlotTracker(&M);
     st->initialize();
@@ -112,7 +112,26 @@ struct full_traceImpl {
 
     for (auto i = it; i != eit; ++i) {
       DISubprogram S(*i);
-      mangled_to_original_name[S.getLinkageName().str()] = S.getName().str();
+
+      auto MangledName = S.getLinkageName().str();
+      auto Name = S.getName().str();
+
+      assert(Name.size() || MangledName.size());
+
+      // Checks out whether Name or Mangled Name matches.
+      auto MangledIt = user_workloads.find(MangledName);
+      bool isMangledMatch = MangledIt != user_workloads.end();
+
+      auto PreMangledIt = user_workloads.find(Name);
+      bool isPreMangledMatch = PreMangledIt != user_workloads.end();
+
+      if (isMangledMatch | isPreMangledMatch) {
+        if (MangledName.empty()) {
+          this->functions.insert(Name);
+        } else {
+          this->functions.insert(MangledName);
+        }
+      }
     }
 
     return false;
@@ -330,13 +349,8 @@ struct full_traceImpl {
       st->incorporateFunction(func);
       curr_function = func;
     }
-    std::map<string, string>::iterator it =
-        mangled_to_original_name.find(curr_function->getName().str());
-    if (it != mangled_to_original_name.end()) {
-      strcpy(funcName, it->second.c_str());
-    } else {
-      strcpy(funcName, curr_function->getName().str().c_str());
-    }
+
+    strcpy(funcName, curr_function->getName().str().c_str());
 
     if (!is_tracking_function(funcName))
       return false;
