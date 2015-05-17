@@ -80,13 +80,13 @@ struct full_traceImpl {
 
     // Add external trace_logger function declaratio
     TL_log0 = M.getOrInsertFunction( "trace_logger_log0", VoidTy,
-        I64Ty, I8PtrTy, I8PtrTy, I8PtrTy, I64Ty, NULL);
+        I64Ty, I8PtrTy, I8PtrTy, I8PtrTy, I64Ty, nullptr);
 
     TL_log_int = M.getOrInsertFunction( "trace_logger_log_int", VoidTy,
-        I64Ty, I64Ty, I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy, NULL);
+        I64Ty, I64Ty, I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy, nullptr);
 
     TL_log_double = M.getOrInsertFunction( "trace_logger_log_double", VoidTy,
-        I64Ty, I64Ty, DoubleTy, I64Ty, I8PtrTy, I64Ty, I8PtrTy, NULL);
+        I64Ty, I64Ty, DoubleTy, I64Ty, I8PtrTy, I64Ty, I8PtrTy, nullptr);
 
     if (func_string.empty()) {
       std::cerr << "Please set WORKLOAD as an environment variable!\n";
@@ -97,7 +97,7 @@ struct full_traceImpl {
     st = createSlotTracker(&M);
     st->initialize();
     curr_module = &M;
-    curr_function = NULL;
+    curr_function = nullptr;
 
     DebugInfoFinder Finder;
     Finder.processModule(M);
@@ -217,8 +217,8 @@ struct full_traceImpl {
 
   void createCallForParameterLine(BasicBlock::iterator itr, int line,
                                   int datasize, int datatype = 64,
-                                  bool is_reg = 0, char *reg_id = NULL,
-                                  Value *value = NULL, bool is_phi = 0,
+                                  bool is_reg = 0, char *reg_id = nullptr,
+                                  Value *value = nullptr, bool is_phi = 0,
                                   char *prev_bbid = s_phi) {
     IRBuilder<> IRB(itr);
     Value *v_line = ConstantInt::get(IRB.getInt64Ty(), line);
@@ -228,7 +228,7 @@ struct full_traceImpl {
     Constant *vv_reg_id = createStringArg(reg_id);
     Constant *vv_prev_bbid = createStringArg(prev_bbid);
     ;
-    if (value != NULL) {
+    if (value != nullptr) {
       if (datatype == llvm::Type::IntegerTyID) {
         Value *v_value = IRB.CreateZExt(value, IRB.getInt64Ty());
         Value *args[] = { v_line,    v_size,   v_value,     v_is_reg,
@@ -259,7 +259,7 @@ struct full_traceImpl {
   // opty - opcode or data type
   void print_line(BasicBlock::iterator itr, int line, int line_number,
                   char *func_or_reg_id, char *bbID, char *instID, int opty,
-                  int datasize = 0, Value *value = NULL, bool is_reg = 0,
+                  int datasize = 0, Value *value = nullptr, bool is_reg = 0,
                   char *prev_bbid = s_phi) {
 
     /*Print instruction line*/
@@ -277,7 +277,7 @@ struct full_traceImpl {
     /*Print parameter/result line*/
     else {
       bool is_phi = 0;
-      if (bbID != NULL && strcmp(bbID, "phi") == 0)
+      if (bbID != nullptr && strcmp(bbID, "phi") == 0)
         is_phi = 1;
       createCallForParameterLine(itr, line, datasize, opty, is_reg,
                                  func_or_reg_id, value, is_phi, prev_bbid);
@@ -298,7 +298,7 @@ struct full_traceImpl {
       char tmp[10];
       char dash[5] = "-";
       sprintf(tmp, "%d", instc);
-      if (bbid != NULL)
+      if (bbid != nullptr)
         strcpy(instid, bbid);
       strcat(instid, dash);
       strcat(instid, tmp);
@@ -346,9 +346,9 @@ struct full_traceImpl {
     BasicBlock::iterator insertp = BB.getFirstInsertionPt();
     BasicBlock::iterator itr = BB.begin();
     if (dyn_cast<PHINode>(itr)) {
-      for (; dyn_cast<PHINode>(itr) != NULL; itr++) {
+      for (; dyn_cast<PHINode>(itr) != nullptr; itr++) {
 
-        Value *curr_operand = NULL;
+        Value *curr_operand = nullptr;
         bool is_reg = 0;
         char bbid[256], instid[256], operR[256];
         int line_number = -1;
@@ -379,29 +379,29 @@ struct full_traceImpl {
             if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
 
               int flag = 0;
-              is_reg = getInstId(I, NULL, operR, flag);
+              is_reg = getInstId(I, nullptr, operR, flag);
               assert(flag == 0);
               if (curr_operand->getType()->isVectorTy()) {
-                print_line(insertp, i + 1, -1, operR, s_phi, NULL,
+                print_line(insertp, i + 1, -1, operR, s_phi, nullptr,
                            curr_operand->getType()->getTypeID(),
-                           getMemSize(curr_operand->getType()), NULL, is_reg,
+                           getMemSize(curr_operand->getType()), nullptr, is_reg,
                            prev_bbid);
               } else {
-                print_line(insertp, i + 1, -1, operR, s_phi, NULL,
+                print_line(insertp, i + 1, -1, operR, s_phi, nullptr,
                            I->getType()->getTypeID(), getMemSize(I->getType()),
-                           NULL, is_reg, prev_bbid);
+                           nullptr, is_reg, prev_bbid);
               }
             } else if (curr_operand->getType()->isVectorTy()) {
               char operand_id[256];
               strcpy(operand_id, curr_operand->getName().str().c_str());
-              print_line(insertp, i + 1, -1, operand_id, s_phi, NULL,
+              print_line(insertp, i + 1, -1, operand_id, s_phi, nullptr,
                          curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), NULL, is_reg,
+                         getMemSize(curr_operand->getType()), nullptr, is_reg,
                          prev_bbid);
             } else {
               char operand_id[256];
               strcpy(operand_id, curr_operand->getName().str().c_str());
-              print_line(insertp, i + 1, -1, operand_id, s_phi, NULL,
+              print_line(insertp, i + 1, -1, operand_id, s_phi, nullptr,
                          curr_operand->getType()->getTypeID(),
                          getMemSize(curr_operand->getType()), curr_operand,
                          is_reg, prev_bbid);
@@ -412,13 +412,13 @@ struct full_traceImpl {
         if (!itr->getType()->isVoidTy()) {
           is_reg = 1;
           if (itr->getType()->isVectorTy()) {
-            print_line(insertp, RESULT_LINE, -1, instid, NULL, NULL,
+            print_line(insertp, RESULT_LINE, -1, instid, nullptr, nullptr,
                        itr->getType()->getTypeID(), getMemSize(itr->getType()),
-                       NULL, is_reg);
+                       nullptr, is_reg);
           } else if (itr->isTerminator())
             fprintf(stderr, "It is terminator...\n");
           else {
-            print_line(insertp, RESULT_LINE, -1, instid, NULL, NULL,
+            print_line(insertp, RESULT_LINE, -1, instid, nullptr, nullptr,
                        itr->getType()->getTypeID(), getMemSize(itr->getType()),
                        itr, is_reg);
           }
@@ -429,7 +429,7 @@ struct full_traceImpl {
     /*For Non-Phi Instructions*/
     BasicBlock::iterator nextitr;
     for (BasicBlock::iterator itr = insertp; itr != BB.end(); itr = nextitr) {
-      Value *curr_operand = NULL;
+      Value *curr_operand = nullptr;
       bool is_reg = 0;
       char bbid[256], instid[256], operR[256];
       int line_number = -1;
@@ -476,7 +476,7 @@ struct full_traceImpl {
         curr_operand = itr->getOperand(num_of_operands - 1);
         is_reg = curr_operand->hasName();
         assert(is_reg);
-        print_line(itr, num_of_operands, -1, operR, NULL, NULL,
+        print_line(itr, num_of_operands, -1, operR, nullptr, nullptr,
                    curr_operand->getType()->getTypeID(),
                    getMemSize(curr_operand->getType()), curr_operand, is_reg);
 
@@ -492,20 +492,20 @@ struct full_traceImpl {
           is_reg = curr_operand->hasName();
           if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
             int flag = 0;
-            is_reg = getInstId(I, NULL, operR, flag);
+            is_reg = getInstId(I, nullptr, operR, flag);
             assert(flag == 0);
             if (curr_operand->getType()->isVectorTy()) {
-              print_line(itr, call_id + 1, -1, operR, NULL, NULL,
+              print_line(itr, call_id + 1, -1, operR, nullptr, nullptr,
                          curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), NULL, is_reg);
-              print_line(itr, FORWARD_LINE, -1, curr_arg_name, NULL, NULL,
+                         getMemSize(curr_operand->getType()), nullptr, is_reg);
+              print_line(itr, FORWARD_LINE, -1, curr_arg_name, nullptr, nullptr,
                          curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), NULL, true);
+                         getMemSize(curr_operand->getType()), nullptr, true);
             } else {
-              print_line(itr, call_id + 1, -1, operR, NULL, NULL,
+              print_line(itr, call_id + 1, -1, operR, nullptr, nullptr,
                          I->getType()->getTypeID(), getMemSize(I->getType()),
                          curr_operand, is_reg);
-              print_line(itr, FORWARD_LINE, -1, curr_arg_name, NULL, NULL,
+              print_line(itr, FORWARD_LINE, -1, curr_arg_name, nullptr, nullptr,
                          I->getType()->getTypeID(), getMemSize(I->getType()),
                          curr_operand, true);
             }
@@ -513,40 +513,40 @@ struct full_traceImpl {
             if (curr_operand->getType()->isVectorTy()) {
               char operand_id[256];
               strcpy(operand_id, curr_operand->getName().str().c_str());
-              print_line(itr, call_id + 1, -1, operand_id, NULL, NULL,
+              print_line(itr, call_id + 1, -1, operand_id, nullptr, nullptr,
                          curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), NULL, is_reg);
-              print_line(itr, FORWARD_LINE, -1, curr_arg_name, NULL, NULL,
+                         getMemSize(curr_operand->getType()), nullptr, is_reg);
+              print_line(itr, FORWARD_LINE, -1, curr_arg_name, nullptr, nullptr,
                          curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), NULL, true);
+                         getMemSize(curr_operand->getType()), nullptr, true);
             } else if (curr_operand->getType()->isLabelTy()) {
               char label_id[256];
               getBBId(curr_operand, label_id);
-              print_line(itr, call_id + 1, -1, label_id, NULL, NULL,
+              print_line(itr, call_id + 1, -1, label_id, nullptr, nullptr,
                          curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), NULL, true);
-              print_line(itr, FORWARD_LINE, -1, curr_arg_name, NULL, NULL,
+                         getMemSize(curr_operand->getType()), nullptr, true);
+              print_line(itr, FORWARD_LINE, -1, curr_arg_name, nullptr, nullptr,
                          curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), NULL, true);
+                         getMemSize(curr_operand->getType()), nullptr, true);
             }
             // is function
             else if (curr_operand->getValueID() == 2) {
               char func_id[256];
               strcpy(func_id, curr_operand->getName().str().c_str());
-              print_line(itr, call_id + 1, -1, func_id, NULL, NULL,
+              print_line(itr, call_id + 1, -1, func_id, nullptr, nullptr,
                          curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), NULL, is_reg);
-              print_line(itr, FORWARD_LINE, -1, curr_arg_name, NULL, NULL,
+                         getMemSize(curr_operand->getType()), nullptr, is_reg);
+              print_line(itr, FORWARD_LINE, -1, curr_arg_name, nullptr, nullptr,
                          curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), NULL, true);
+                         getMemSize(curr_operand->getType()), nullptr, true);
             } else {
               char operand_id[256];
               strcpy(operand_id, curr_operand->getName().str().c_str());
-              print_line(itr, call_id + 1, -1, operand_id, NULL, NULL,
+              print_line(itr, call_id + 1, -1, operand_id, nullptr, nullptr,
                          curr_operand->getType()->getTypeID(),
                          getMemSize(curr_operand->getType()), curr_operand,
                          is_reg);
-              print_line(itr, FORWARD_LINE, -1, curr_arg_name, NULL, NULL,
+              print_line(itr, FORWARD_LINE, -1, curr_arg_name, nullptr, nullptr,
                          curr_operand->getType()->getTypeID(),
                          getMemSize(curr_operand->getType()), curr_operand,
                          true);
@@ -566,14 +566,14 @@ struct full_traceImpl {
             // for instructions using registers
             if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
               int flag = 0;
-              is_reg = getInstId(I, NULL, operR, flag);
+              is_reg = getInstId(I, nullptr, operR, flag);
               assert(flag == 0);
               if (curr_operand->getType()->isVectorTy()) {
-                print_line(itr, i + 1, -1, operR, NULL, NULL,
+                print_line(itr, i + 1, -1, operR, nullptr, nullptr,
                            curr_operand->getType()->getTypeID(),
-                           getMemSize(curr_operand->getType()), NULL, is_reg);
+                           getMemSize(curr_operand->getType()), nullptr, is_reg);
               } else {
-                print_line(itr, i + 1, -1, operR, NULL, NULL,
+                print_line(itr, i + 1, -1, operR, nullptr, nullptr,
                            I->getType()->getTypeID(), getMemSize(I->getType()),
                            curr_operand, is_reg);
               }
@@ -581,27 +581,27 @@ struct full_traceImpl {
               if (curr_operand->getType()->isVectorTy()) {
                 char operand_id[256];
                 strcpy(operand_id, curr_operand->getName().str().c_str());
-                print_line(itr, i + 1, -1, operand_id, NULL, NULL,
+                print_line(itr, i + 1, -1, operand_id, nullptr, nullptr,
                            curr_operand->getType()->getTypeID(),
-                           getMemSize(curr_operand->getType()), NULL, is_reg);
+                           getMemSize(curr_operand->getType()), nullptr, is_reg);
               } else if (curr_operand->getType()->isLabelTy()) {
                 char label_id[256];
                 getBBId(curr_operand, label_id);
-                print_line(itr, i + 1, -1, label_id, NULL, NULL,
+                print_line(itr, i + 1, -1, label_id, nullptr, nullptr,
                            curr_operand->getType()->getTypeID(),
-                           getMemSize(curr_operand->getType()), NULL, true);
+                           getMemSize(curr_operand->getType()), nullptr, true);
               }
               // is function
               else if (curr_operand->getValueID() == 2) {
                 char func_id[256];
                 strcpy(func_id, curr_operand->getName().str().c_str());
-                print_line(itr, i + 1, -1, func_id, NULL, NULL,
+                print_line(itr, i + 1, -1, func_id, nullptr, nullptr,
                            curr_operand->getType()->getTypeID(),
-                           getMemSize(curr_operand->getType()), NULL, is_reg);
+                           getMemSize(curr_operand->getType()), nullptr, is_reg);
               } else {
                 char operand_id[256];
                 strcpy(operand_id, curr_operand->getName().str().c_str());
-                print_line(itr, i + 1, -1, operand_id, NULL, NULL,
+                print_line(itr, i + 1, -1, operand_id, nullptr, nullptr,
                            curr_operand->getType()->getTypeID(),
                            getMemSize(curr_operand->getType()), curr_operand,
                            is_reg);
@@ -617,13 +617,13 @@ struct full_traceImpl {
       if (!itr->getType()->isVoidTy()) {
         is_reg = 1;
         if (itr->getType()->isVectorTy()) {
-          print_line(nextitr, RESULT_LINE, -1, instid, NULL, NULL,
+          print_line(nextitr, RESULT_LINE, -1, instid, nullptr, nullptr,
                      itr->getType()->getTypeID(), getMemSize(itr->getType()),
-                     NULL, is_reg);
+                     nullptr, is_reg);
         } else if (itr->isTerminator())
           printf("It is terminator...\n");
         else {
-          print_line(nextitr, RESULT_LINE, -1, instid, NULL, NULL,
+          print_line(nextitr, RESULT_LINE, -1, instid, nullptr, nullptr,
                      itr->getType()->getTypeID(), getMemSize(itr->getType()),
                      itr, is_reg);
         }
