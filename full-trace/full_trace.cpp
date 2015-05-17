@@ -72,27 +72,21 @@ struct full_traceImpl {
   std::map<string, string> mangled_to_original_name;
 
   bool doInitialization(Module &M, std::string func_string) {
+    auto &llvm_context = M.getContext();
+    auto I64Ty = Type::getInt64Ty(llvm_context);
+    auto I8PtrTy = Type::getInt8PtrTy(llvm_context);
+    auto VoidTy = Type::getVoidTy(llvm_context);
+    auto DoubleTy = Type::getDoubleTy(llvm_context);
+
     // Add external trace_logger function declaratio
-    TL_log0 = M.getOrInsertFunction(
-        "trace_logger_log0", Type::getVoidTy(M.getContext()),
-        Type::getInt64Ty(M.getContext()), Type::getInt8PtrTy((M.getContext())),
-        Type::getInt8PtrTy((M.getContext())),
-        Type::getInt8PtrTy((M.getContext())), Type::getInt64Ty(M.getContext()),
-        NULL);
+    TL_log0 = M.getOrInsertFunction( "trace_logger_log0", VoidTy,
+        I64Ty, I8PtrTy, I8PtrTy, I8PtrTy, I64Ty, NULL);
 
-    TL_log_int = M.getOrInsertFunction(
-        "trace_logger_log_int", Type::getVoidTy(M.getContext()),
-        Type::getInt64Ty(M.getContext()), Type::getInt64Ty(M.getContext()),
-        Type::getInt64Ty(M.getContext()), Type::getInt64Ty(M.getContext()),
-        Type::getInt8PtrTy((M.getContext())), Type::getInt64Ty(M.getContext()),
-        Type::getInt8PtrTy((M.getContext())), NULL);
+    TL_log_int = M.getOrInsertFunction( "trace_logger_log_int", VoidTy,
+        I64Ty, I64Ty, I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy, NULL);
 
-    TL_log_double = M.getOrInsertFunction(
-        "trace_logger_log_double", Type::getVoidTy(M.getContext()),
-        Type::getInt64Ty(M.getContext()), Type::getInt64Ty(M.getContext()),
-        Type::getDoubleTy(M.getContext()), Type::getInt64Ty(M.getContext()),
-        Type::getInt8PtrTy((M.getContext())), Type::getInt64Ty(M.getContext()),
-        Type::getInt8PtrTy((M.getContext())), NULL);
+    TL_log_double = M.getOrInsertFunction( "trace_logger_log_double", VoidTy,
+        I64Ty, I64Ty, DoubleTy, I64Ty, I8PtrTy, I64Ty, I8PtrTy, NULL);
 
     if (func_string.empty()) {
       std::cerr << "Please set WORKLOAD as an environment variable!\n";
