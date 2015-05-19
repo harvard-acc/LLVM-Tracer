@@ -14,10 +14,9 @@ International Symposium on Performance Analysis of Systems and Software
 ============================================
 Requirements:
 -------------------
-  LLVM 3.4 and Clang 3.4 64-bit
-  or
-  LLVM 3.5 and Clang 3.5 64-bit
-
+  1. LLVM 3.4 and Clang 3.4 64-bit or LLVM 3.5 and Clang 3.5 64-bit
+  2. GCC 4.7 or newer for C++11 features.
+  3. (Optional) CMake 2.8.12 or newer to use the CMake flow.
 
 Build:
 -----------------
@@ -37,7 +36,7 @@ Build:
 
 Build with CMake:
 -----------------
-  CMake is a configure tool which allows you to out-of-source build. 
+  CMake is a configure tool which allows you to out-of-source build.
   LLVM-Tracer Requires CMake newer than 2.8.12. By default, CMake
   searches for LLVM 3.4.
 
@@ -106,7 +105,7 @@ Build with CMake:
        By assign this option, CMake will build fulltrace.so &
        trace_logger.llvm under the source directory.
        Other llvm bitcode and object files still remain in the build directory.
-       
+
      ```
 
 Build with Makefile:
@@ -119,6 +118,10 @@ Build with Makefile:
      export $LLVM_HOME=/path/to/your/llvm/installation
      export $PATH=$LLVM_HOME/bin:$PATH
      export $LD_LIBRARY_PATH=$LLVM_HOME/lib/:$LD_LIBRARY_PATH
+     ```
+     Also set `GCC_INSTALL_HOME` to where you installed gcc4.7+
+     ```
+     export $GCC_INSTALL_HOME=/path/to/your/gcc-4.7-or-up/installation
      ```
 
   2. Go to where you put LLVM-Tracer source code
