@@ -163,7 +163,7 @@ Example program: triad
 
         export TRACER_HOME=/your/path/to/LLVM-Tracer
         opt -S -load=$TRACER_HOME/full-trace/full_trace.so -fulltrace triad.llvm -o triad-opt.llvm
-        llvm-link -o full.llvm triad-opt.llvm $TRACER_HOME/profile-func/tracer_logger.llvm
+        llvm-link -o full.llvm triad-opt.llvm $TRACER_HOME/profile-func/trace_logger.llvm
 
 
      d. Generate machine code:
