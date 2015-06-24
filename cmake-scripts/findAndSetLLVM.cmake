@@ -32,6 +32,8 @@ add_definitions("-DLLVM_VERSION=${LLVM_NO_DOT_VERSION}")
 # probably some llvm-config work to do...
 SET(REQ_LLVM_LIBRARIES ${LLVM_LIBS})
 
+find_package(ZLIB REQUIRED)
+
 # For debug use only
 if(${TEST_CMAKE})
   message("debug messages below")
