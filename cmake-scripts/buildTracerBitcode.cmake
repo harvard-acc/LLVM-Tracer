@@ -26,8 +26,12 @@ function(build_tracer_bitcode TEST_NAME f_SRC WORKLOAD)
 
   set(OPT_FLAGS "-disable-inlining" "-S" "-load=${FULLTRACE_SO}" "-fulltrace")
   set(LLC_FLAGS "-O0" "-disable-fp-elim" "-filetype=asm")
-  set(FINAL_CXX_FLAGS "-static" "-O0" "-fno-inline")
+  set(FINAL_CXX_FLAGS "-O0" "-fno-inline")
   set(FINAL_CXX_LDFLAGS "-lm" "-lz")
+
+  if (NOT ${DYN_LINK_TRACE_CODE})
+    set(FINAL_CXX_FLAGS "-static" ${FINAL_CXX_FLAGS})
+  endif()
 
 
   

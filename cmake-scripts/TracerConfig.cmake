@@ -23,6 +23,18 @@ endif()
 
 SET(RECOMMAND_LLVM_PREFIX ${CMAKE_BINARY_DIR}/lib/llvm-${LLVM_RECOMMEND_VERSION})
 
+
+if(NOT DEFINED DYN_LINK_TRACE_CODE)
+  SET(DYN_LINK_TRACE_CODE FALSE)
+endif()
+
+if (${DYN_LINK_TRACE_CODE})
+  set(DYN_LINK_TRACE_CODE_LIB "dynamic")
+else()
+  set(DYN_LINK_TRACE_CODE_LIB "static")
+endif()
+message(STATUS "Use ${DYN_LINK_TRACE_CODE_LIB} library when linking LLVM-Tracer instrumented code")
+
 if(NOT DEFINED BUILD_ON_SOURCE)
   SET(BUILD_ON_SOURCE TRUE)
 endif()

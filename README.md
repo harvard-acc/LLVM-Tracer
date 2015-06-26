@@ -106,6 +106,9 @@ Build with CMake:
        trace_logger.llvm under the source directory.
        Other llvm bitcode and object files still remain in the build directory.
 
+     -DDYN_LINK_TRACE_CODE=TRUE,FALSE    (default : FALSE)
+       By turn on this option, all the LLVM-Tracer instrumented code
+       are linked with dynamic libraries.
      ```
 
 Build with Makefile:
