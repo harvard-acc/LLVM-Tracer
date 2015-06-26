@@ -27,6 +27,14 @@ if(NOT DEFINED BUILD_ON_SOURCE)
   SET(BUILD_ON_SOURCE TRUE)
 endif()
 
+if(${BUILD_ON_SOURCE})
+  message(STATUS "Generate final binaries in the source directory. "
+             "To make them in the build directory, -DBUILD_ON_SOURCE=FALSE")
+else()
+  message(STATUS "Generate final binaries in the build directory. "
+             "To make them in the source directory, -DBUILD_ON_SOURCE=TRUE")
+endif()
+
 if(NOT DEFINED AUTOINSTALL)
   SET(AUTOINSTALL FALSE)
 endif()
