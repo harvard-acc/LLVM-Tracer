@@ -80,6 +80,14 @@ Build with CMake:
        this option is not defined, environment variable LLVM_HOME will be
        used.
 
+     -DLLVMC_FLAGS="additional cflags"        (default : empty)
+       This option offers you the power to pass additional cflags
+       to Clang while building LLVM IR.
+
+     -DTRACER_LD_FLAGS="additional ldflags"   (default : empty)
+       This option offers you the power to pass additional ldflags
+       to g++ while linking instrumented LLVM IR to executable.
+
      -DLLVM_RECOMMEND_VERSION="3.4", "3.5"    (default : 3.4)
        LLVM-Tracer supports both LLVM 3.4 and 3.5. It uses LLVM 3.4 by
        default, but you can manually specify the LLVM version to use.
