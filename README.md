@@ -46,7 +46,7 @@ Build with CMake:
 
   1. Set `LLVM_HOME` to where you installed LLVM
      ```
-     export $LLVM_HOME=/path/to/your/llvm/installation
+     export LLVM_HOME=/path/to/your/llvm/installation
      ```
 
   2. Configure with CMake and build LLVM-Tracer source code
@@ -140,13 +140,13 @@ Build with Makefile:
      Add LLVM and Clang binary to your PATH:
 
      ```
-     export $LLVM_HOME=/path/to/your/llvm/installation
-     export $PATH=$LLVM_HOME/bin:$PATH
-     export $LD_LIBRARY_PATH=$LLVM_HOME/lib/:$LD_LIBRARY_PATH
+     export LLVM_HOME=/path/to/your/llvm/installation
+     export PATH=$LLVM_HOME/bin:$PATH
+     export LD_LIBRARY_PATH=$LLVM_HOME/lib/:$LD_LIBRARY_PATH
      ```
      Also set `GCC_INSTALL_HOME` to where you installed gcc4.7+
      ```
-     export $GCC_INSTALL_HOME=/path/to/your/gcc-4.7-or-up/installation
+     export GCC_INSTALL_HOME=/path/to/your/gcc-4.7-or-up/installation
      ```
 
   2. Go to where you put LLVM-Tracer source code
@@ -171,10 +171,11 @@ Example program: triad
         In the triad example, we want to analyze the triad kernel instead of the setup
         and initialization work done in main.
         To tell LLVM-Tracer the functions we are
-        interested, set enviroment variable WORKLOAD to be the function names (if you
-        have multiple functions interested, separated by comma):
-
+        interested in, set enviroment variable WORKLOAD to be the function names: 
         export WORKLOAD=triad
+
+    (if you have multiple functions you are interested in, separate with commas):
+
         export WORKLOAD=md,md_kernel
 
      b. Generate LLVM IR:
