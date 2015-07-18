@@ -32,7 +32,8 @@ MACRO(find_xz TAR_EXE)
 		OUTPUT_VARIABLE TAR_VERSION
 		OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-  set(version_pattern "[0-9]*\\.[0-9]*\\.[0-9]*")
+  # This pattern matches either 1.x.y or 1.x
+  set(version_pattern "[0-9]*\\.[0-9]*(\\.[0-9]*)?")
   string(REGEX MATCH ${version_pattern} TAR_VERSION "${TAR_VERSION}")
 
   # tar version newer than 1.22 has support to xz compression
@@ -78,7 +79,7 @@ MACRO(configure_autoinstall AUTOINSTALL_DIR)
 
   if(${TEST_CMAKE})
     # for test purpose, I don't want to waste bandwidth of llvm.org.
-    SET(SITE_URL file://${CMAKE_SOURCE_DIR}/../source-tgz)
+    SET(SITE_URL file://${CMAKE_BINARY_DIR}/../source-tgz)
   else()
     # normal situation.
     SET(SITE_URL http://llvm.org/releases)
@@ -146,7 +147,7 @@ FUNCTION(check_and_download target_url target_file target_md5)
 
   # if file not exists, download it.
   if(NOT EXISTS ${target_file})
-    message(STATUS "finds no ${target_file}, so download it!")
+    message(STATUS "finds no ${target_file}, \n\tdownload ${target_url}")
     FILE(DOWNLOAD ${target_url} ${target_file} SHOW_PROGRESS
          EXPECTED_MD5 ${target_md5})
   else()
@@ -197,10 +198,20 @@ FUNCTION(install_llvm AUTOINSTALL_DIR)
     FILE(MAKE_DIRECTORY ${llvm_build_dir})
   endif()
 
+  # If users set up some llvm install configurations
+  if (DEFINED GCC_INSTALL_PREFIX)
+    list(APPEND LLVM_BIULD_OPTIONS "-DGCC_INSTALL_PREFIX=${GCC_INSTALL_PREFIX}")
+  endif()
+
+  if (DEFINED CMAKE_PREFIX_PATH)
+    list(APPEND LLVM_BIULD_OPTIONS "-DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}")
+  endif()
+
   # This script configures llvm for you.
   execute_process(COMMAND ${CMAKE_COMMAND} ${LLVM_SOURCE_DIR}
-		  -DCMAKE_INSTALL_PREFIX=${LLVM_ROOT_ARG}
-		  WORKING_DIRECTORY ${llvm_build_dir})
+                  ${LLVM_BIULD_OPTIONS}
+                  -DCMAKE_INSTALL_PREFIX=${LLVM_ROOT_ARG}
+                  WORKING_DIRECTORY ${llvm_build_dir})
 
   message(STATUS "finish configure the source code.")
   message(STATUS "Start to build and install LLVM, it may take tens of minutes."
