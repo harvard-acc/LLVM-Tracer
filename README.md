@@ -92,6 +92,20 @@ Build with CMake:
        LLVM-Tracer supports both LLVM 3.4 and 3.5. It uses LLVM 3.4 by
        default, but you can manually specify the LLVM version to use.
 
+     -DGCC_INSTALL_PREFIX="/your/gcc/location"       (default : empty)
+       Clang++ requires stdc++ of GCC. This option denotes the
+       path to search libstdc++ and it's headers. If this option
+       is undefined, Clang++ will apply it's default settings.
+       In LLVM auto-installer, this option will be used as the
+       default search path by the installed Clang.
+
+     -DCMAKE_PREFIX_PATH="/your/toolchain/location"  (default : empty)
+       This CMake option denotes the additional path to search
+       dependent tools. In a sitution where you want to use LLVM
+       auto-installer and have pyhton 2.7 installed outside from
+       system directories, you should manually specify location
+       of python via this option.
+
      -DAUTOINSTALL=TRUE,FALSE    (default : FALSE)
        By this option, CMake scripts will automatically download, build and
        install LLVM for you if finds no LLVM installation. Using this
