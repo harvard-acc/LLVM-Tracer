@@ -5,7 +5,7 @@ endif()
 
 # TODO : not used now
 # the llvm libraries which the executable need.
-SET(NEED_LLVM_LIB mcjit native bitwriter jit interpreter
+SET(NEED_LLVM_LIB mcjit native bitwriter interpreter
 		nativecodegen linker irreader)
 
 SET(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -Wall -W -Wno-unused-parameter
