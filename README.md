@@ -94,8 +94,8 @@ Build with CMake:
 
      -DGCC_INSTALL_PREFIX="/your/gcc/location"       (default : empty)
        Clang++ requires stdc++ of GCC. This option denotes the
-       path to search libstdc++ and it's headers. If this option
-       is undefined, Clang++ will apply it's default settings.
+       path to search libstdc++ and its headers. If this option
+       is undefined, Clang++ will apply its default settings.
        In LLVM auto-installer, this option will be used as the
        default search path by the installed Clang.
 
@@ -108,7 +108,7 @@ Build with CMake:
 
      -DAUTOINSTALL=TRUE,FALSE    (default : FALSE)
        By this option, CMake scripts will automatically download, build and
-       install LLVM for you if finds no LLVM installation. Using this
+       install LLVM for you if it finds no LLVM installation. Using this
        function requires tar-1.22 or newer to extract xz format.
 
        The default installation path is under /your/build_dir/lib/llvm-3.x.
