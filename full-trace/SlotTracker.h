@@ -6,7 +6,7 @@
 
 #if (LLVM_VERSION == 34)
   #include "llvm/DebugInfo.h"
-#elif (LLVM_VERSION == 35)
+#elif (LLVM_VERSION >= 35)
   #include "llvm/IR/DebugInfo.h"
 #endif
 

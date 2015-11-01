@@ -16,8 +16,13 @@ findLLVMTool(LLVM_OPT "opt")
 findLLVMTool(LLVM_LLC "llc")
 findLLVMTool(LLVM_COMPILER "clang")
 
-set(LLVMC_FLAGS ${LLVM_DEFINITIONS}
-	-fno-inline-functions -fno-use-cxa-atexit)
+list(APPEND LLVMC_FLAGS ${LLVM_DEFINITIONS})
+list(APPEND LLVMC_FLAGS "-fno-inline-functions" "-fno-use-cxa-atexit")
+
+if(DEFINED GCC_INSTALL_PREFIX)
+  list(APPEND LLVMC_FLAGS "--gcc-toolchain=${GCC_INSTALL_PREFIX}")
+endif()
+
 set(LLVM_OPT_FLAGS )
 
 # Use settings from LLVM cmake module or llvm-config.
@@ -31,6 +36,8 @@ add_definitions("-DLLVM_VERSION=${LLVM_NO_DOT_VERSION}")
 
 # probably some llvm-config work to do...
 SET(REQ_LLVM_LIBRARIES ${LLVM_LIBS})
+
+find_package(ZLIB REQUIRED)
 
 # For debug use only
 if(${TEST_CMAKE})

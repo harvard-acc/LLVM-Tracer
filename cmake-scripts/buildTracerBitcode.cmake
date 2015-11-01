@@ -7,21 +7,35 @@ function(build_tracer_bitcode TEST_NAME f_SRC WORKLOAD)
   set(RAW_EXE "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}")
   set(PROFILE_EXE "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}-instrumented")
 
-  if(${BUILD_ON_SOURCE})
-    set(TRACE_LOGGER "${CMAKE_CURRENT_SOURCE_DIR}/../../profile-func/trace_logger.${LLVM_EXT}")
+  set(LOGGER_PATH "profile-func/trace_logger.${LLVM_EXT}")
+  if (${HAS_ALADDIN})
+    if(${BUILD_ON_SOURCE})
+      set(TRACE_LOGGER "${TRACER_DIR}/${LOGGER_PATH}")
+    else()
+      set(TRACE_LOGGER "${CMAKE_BINARY_DIR}/LLVM-Tracer/${LOGGER_PATH}")
+    endif()
   else()
-    set(TRACE_LOGGER "${CMAKE_CURRENT_BINARY_DIR}/../../profile-func/trace_logger.${LLVM_EXT}")
+    if(${BUILD_ON_SOURCE})
+      set(TRACE_LOGGER "${CMAKE_SOURCE_DIR}/${LOGGER_PATH}")
+    else()
+      set(TRACE_LOGGER "${CMAKE_BINARY_DIR}/${LOGGER_PATH}")
+    endif()
   endif()
 
   set(FULLTRACE_SO "$<TARGET_FILE:full_trace>")
 
   set(CFLAGS "-g" "-static" "-O1" "-fno-slp-vectorize" "-fno-vectorize"
-		"-fno-unroll-loops" "-fno-inline" "-fno-builtin")
+		"-fno-unroll-loops" "-fno-inline" "-fno-builtin"
+		"-I${ZLIB_INCLUDE_DIRS}")
 
   set(OPT_FLAGS "-disable-inlining" "-S" "-load=${FULLTRACE_SO}" "-fulltrace")
   set(LLC_FLAGS "-O0" "-disable-fp-elim" "-filetype=asm")
-  set(FINAL_CXX_FLAGS "-static" "-O0" "-fno-inline")
-  set(FINAL_CXX_LDFLAGS "-lm" "-lz")
+  set(FINAL_CXX_FLAGS "-O0" "-fno-inline")
+  set(FINAL_CXX_LDFLAGS ${TRACER_LD_FLAGS} "-lm" "-lz")
+
+  if (NOT ${DYN_LINK_TRACE_CODE})
+    set(FINAL_CXX_FLAGS "-static" ${FINAL_CXX_FLAGS})
+  endif()
 
 
   

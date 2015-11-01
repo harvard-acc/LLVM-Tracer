@@ -80,13 +80,35 @@ Build with CMake:
        this option is not defined, environment variable LLVM_HOME will be
        used.
 
+     -DLLVMC_FLAGS="additional cflags"        (default : empty)
+       This option offers you the power to pass additional cflags
+       to Clang while building LLVM IR.
+
+     -DTRACER_LD_FLAGS="additional ldflags"   (default : empty)
+       This option offers you the power to pass additional ldflags
+       to g++ while linking instrumented LLVM IR to executable.
+
      -DLLVM_RECOMMEND_VERSION="3.4", "3.5"    (default : 3.4)
        LLVM-Tracer supports both LLVM 3.4 and 3.5. It uses LLVM 3.4 by
        default, but you can manually specify the LLVM version to use.
 
+     -DGCC_INSTALL_PREFIX="/your/gcc/location"       (default : empty)
+       Clang++ requires stdc++ of GCC. This option denotes the
+       path to search libstdc++ and its headers. If this option
+       is undefined, Clang++ will apply its default settings.
+       In LLVM auto-installer, this option will be used as the
+       default search path by the installed Clang.
+
+     -DCMAKE_PREFIX_PATH="/your/toolchain/location"  (default : empty)
+       This CMake option denotes the additional path to search
+       dependent tools. In a sitution where you want to use LLVM
+       auto-installer and have pyhton 2.7 installed outside from
+       system directories, you should manually specify location
+       of python via this option.
+
      -DAUTOINSTALL=TRUE,FALSE    (default : FALSE)
        By this option, CMake scripts will automatically download, build and
-       install LLVM for you if finds no LLVM installation. Using this
+       install LLVM for you if it finds no LLVM installation. Using this
        function requires tar-1.22 or newer to extract xz format.
 
        The default installation path is under /your/build_dir/lib/llvm-3.x.
@@ -106,6 +128,9 @@ Build with CMake:
        trace_logger.llvm under the source directory.
        Other llvm bitcode and object files still remain in the build directory.
 
+     -DDYN_LINK_TRACE_CODE=TRUE,FALSE    (default : FALSE)
+       By turn on this option, all the LLVM-Tracer instrumented code
+       are linked with dynamic libraries.
      ```
 
 Build with Makefile:

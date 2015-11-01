@@ -5,7 +5,7 @@ endif()
 
 # TODO : not used now
 # the llvm libraries which the executable need.
-SET(NEED_LLVM_LIB mcjit native bitwriter jit interpreter
+SET(NEED_LLVM_LIB mcjit native bitwriter interpreter
 		nativecodegen linker irreader)
 
 SET(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -Wall -W -Wno-unused-parameter
@@ -16,6 +16,8 @@ STRING(REPLACE ";" " " CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 # to use it : cmake /where/source/code -DCMAKE_BUILD_TYPE=DEBUG
 set(CMAKE_CXX_FLAGS_DEBUG -g3)
 
+set(CMAKE_CXX_FLAGS_RELEASE -O2)
+
 
 if(NOT DEFINED TEST_CMAKE)
   SET(TEST_CMAKE FALSE)
@@ -23,8 +25,28 @@ endif()
 
 SET(RECOMMAND_LLVM_PREFIX ${CMAKE_BINARY_DIR}/lib/llvm-${LLVM_RECOMMEND_VERSION})
 
+
+if(NOT DEFINED DYN_LINK_TRACE_CODE)
+  SET(DYN_LINK_TRACE_CODE FALSE)
+endif()
+
+if (${DYN_LINK_TRACE_CODE})
+  set(DYN_LINK_TRACE_CODE_LIB "dynamic")
+else()
+  set(DYN_LINK_TRACE_CODE_LIB "static")
+endif()
+message(STATUS "Use ${DYN_LINK_TRACE_CODE_LIB} library when linking LLVM-Tracer instrumented code")
+
 if(NOT DEFINED BUILD_ON_SOURCE)
   SET(BUILD_ON_SOURCE TRUE)
+endif()
+
+if(${BUILD_ON_SOURCE})
+  message(STATUS "Generate final binaries in the source directory. "
+             "To make them in the build directory, -DBUILD_ON_SOURCE=FALSE")
+else()
+  message(STATUS "Generate final binaries in the build directory. "
+             "To make them in the source directory, -DBUILD_ON_SOURCE=TRUE")
 endif()
 
 if(NOT DEFINED AUTOINSTALL)

@@ -105,7 +105,7 @@ struct full_traceImpl {
     #if (LLVM_VERSION == 34)
       auto it = Finder.subprogram_begin();
       auto eit = Finder.subprogram_end();
-    #elif (LLVM_VERSION == 35)
+    #elif (LLVM_VERSION >= 35)
       auto it = Finder.subprograms().begin();
       auto eit = Finder.subprograms().end();
     #endif
