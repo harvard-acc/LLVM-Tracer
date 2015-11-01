@@ -22,11 +22,6 @@ function(build_tracer_bitcode TEST_NAME f_SRC WORKLOAD)
     endif()
   endif()
 
-  if(${BUILD_ON_SOURCE})
-    message(${TRACE_LOGGER})
-    string(REPLACE "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}" TRACE_LOGGER "${TRACE_LOGGER}")
-  endif()
-
   set(FULLTRACE_SO "$<TARGET_FILE:full_trace>")
 
   set(CFLAGS "-g" "-static" "-O1" "-fno-slp-vectorize" "-fno-vectorize"
