@@ -1,5 +1,5 @@
 # In two-number form only. LLVM-Tracer will determine the patch version for you.
-if(NOT DEFINED LLVM_RECOMMEND_VERSION)
+if(NOT DEFINED ENV{LLVM_RECOMMEND_VERSION})
   SET(LLVM_RECOMMEND_VERSION 3.4)
 endif()
 
