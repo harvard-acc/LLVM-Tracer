@@ -20,6 +20,7 @@
 #define FORWARD_LINE 24601
 #define DMA_STORE 98
 #define DMA_LOAD 99
+
 char s_phi[] = "phi";
 using namespace llvm;
 using namespace std;
@@ -68,10 +69,15 @@ struct full_traceImpl {
   SlotTracker *st;
   Function *curr_function;
 
-  std::set<std::string> functions;
+  std::set<std::string> tracked_functions;
+
+  // True if WORKLOAD specifies a single function, in which case the tracer
+  // will track all functions called by it (the top-level function).
+  bool is_toplevel_mode;
 
   bool doInitialization(Module &M, std::string func_string) {
     auto &llvm_context = M.getContext();
+    auto I1Ty = Type::getInt1Ty(llvm_context);
     auto I64Ty = Type::getInt64Ty(llvm_context);
     auto I8PtrTy = Type::getInt8PtrTy(llvm_context);
     auto VoidTy = Type::getVoidTy(llvm_context);
@@ -79,7 +85,7 @@ struct full_traceImpl {
 
     // Add external trace_logger function declaratio
     TL_log0 = M.getOrInsertFunction( "trace_logger_log0", VoidTy,
-        I64Ty, I8PtrTy, I8PtrTy, I8PtrTy, I64Ty, nullptr);
+        I64Ty, I8PtrTy, I8PtrTy, I8PtrTy, I64Ty, I1Ty, I1Ty, nullptr);
 
     TL_log_int = M.getOrInsertFunction( "trace_logger_log_int", VoidTy,
         I64Ty, I64Ty, I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy, nullptr);
@@ -93,6 +99,10 @@ struct full_traceImpl {
     }
     std::set<std::string> user_workloads;
     split(func_string, ',', user_workloads);
+    // Set toplevel function tracking mode if only one function is specified.
+    is_toplevel_mode = (user_workloads.size() == 1);
+    if (is_toplevel_mode)
+      std::cout << "LLVM-Tracer is instrumenting this workload in top-level mode.\n";
 
     st = createSlotTracker(&M);
     st->initialize();
@@ -127,9 +137,9 @@ struct full_traceImpl {
 
       if (isMangledMatch | isPreMangledMatch) {
         if (MangledName.empty()) {
-          this->functions.insert(Name);
+          this->tracked_functions.insert(Name);
         } else {
-          this->functions.insert(MangledName);
+          this->tracked_functions.insert(MangledName);
         }
       }
     }
@@ -155,8 +165,8 @@ struct full_traceImpl {
 
   bool is_tracking_function(string func) {
     // perform search in log(n) time.
-    std::set<std::string>::iterator it = this->functions.find(func);
-    if (it != this->functions.end()) {
+    std::set<std::string>::iterator it = this->tracked_functions.find(func);
+    if (it != this->tracked_functions.end()) {
         return true;
     }
     return false;
@@ -284,14 +294,25 @@ struct full_traceImpl {
     /*Print instruction line*/
     if (line == 0) {
       IRBuilder<> IRB(itr);
-      Value *v_opty, *v_linenumber;
+      Value *v_opty, *v_linenumber, *v_is_tracked_function,
+          *v_is_toplevel_mode;
       v_opty = ConstantInt::get(IRB.getInt64Ty(), opty);
       v_linenumber = ConstantInt::get(IRB.getInt64Ty(), line_number);
+
+      // These two parameters are passed so the instrumented binary can be run
+      // completely standalone (does not need the WORKLOAD env variable
+      // defined).
+      v_is_tracked_function = ConstantInt::get(
+          IRB.getInt1Ty(),
+          (tracked_functions.find(func_or_reg_id) != tracked_functions.end()));
+      v_is_toplevel_mode = ConstantInt::get(IRB.getInt1Ty(), is_toplevel_mode);
       Constant *vv_func_id = createStringArg(func_or_reg_id);
       Constant *vv_bb = createStringArg(bbID);
       Constant *vv_inst = createStringArg(instID);
-      IRB.CreateCall5(TL_log0, v_linenumber, vv_func_id, vv_bb, vv_inst,
-                      v_opty);
+      Value *args[] = { v_linenumber,      vv_func_id, vv_bb,
+                        vv_inst,           v_opty,     v_is_tracked_function,
+                        v_is_toplevel_mode };
+      IRB.CreateCall(TL_log0, args);
     }
     /*Print parameter/result line*/
     else {
@@ -339,7 +360,7 @@ struct full_traceImpl {
       fprintf(stderr, "!!This block does not have a name or a ID!\n");
   }
 
-  bool runOnBasicBlock(BasicBlock &BB) {
+  virtual bool runOnBasicBlock(BasicBlock &BB) {
     Function *func = BB.getParent();
     int instc = 0;
     char funcName[256];
@@ -352,7 +373,7 @@ struct full_traceImpl {
 
     strcpy(funcName, curr_function->getName().str().c_str());
 
-    if (!is_tracking_function(funcName))
+    if (!is_toplevel_mode && !is_tracking_function(funcName))
       return false;
 
     std::cout << "Tracking function: " << funcName << std::endl;
@@ -361,7 +382,6 @@ struct full_traceImpl {
     BasicBlock::iterator itr = BB.begin();
     if (dyn_cast<PHINode>(itr)) {
       for (; dyn_cast<PHINode>(itr) != nullptr; itr++) {
-
         Value *curr_operand = nullptr;
         bool is_reg = 0;
         char bbid[256], instid[256], operR[256];
@@ -463,15 +483,21 @@ struct full_traceImpl {
         DILocation Loc(N); // DILocation is in DebugInfo.h
         line_number = Loc.getLineNumber();
       }
-      int callType = -1;
+      int callType = 1;
       if (CallInst *I = dyn_cast<CallInst>(itr)) {
-        char callfunc[256];
         Function *fun = I->getCalledFunction();
-        if (fun)
-          strcpy(callfunc, fun->getName().str().c_str());
-        callType = trace_or_not(callfunc);
-        if (callType == -1)
+        // This is an indirect function invocation (i.e. through function
+        // pointer). This cannot happen for code that we want to turn into
+        // hardware, so skip it. Also, skip intrinsics.
+        if (!fun || fun->isIntrinsic())
           continue;
+        if (!is_toplevel_mode) {
+          char callfunc[256];
+          strcpy(callfunc, fun->getName().str().c_str());
+          callType = trace_or_not(callfunc);
+          if (callType == -1)
+            continue;
+        }
       }
 
       int num_of_operands = itr->getNumOperands();
