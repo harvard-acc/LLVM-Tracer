@@ -20,6 +20,8 @@
 #define FORWARD_LINE 24601
 #define DMA_STORE 98
 #define DMA_LOAD 99
+#define SINE 102
+#define COSINE 103
 
 char s_phi[] = "phi";
 using namespace llvm;
@@ -510,6 +512,10 @@ struct full_traceImpl {
           print_line(itr, 0, line_number, funcName, bbid, instid, DMA_LOAD);
         else if (fun->getName().str().find("dmaStore") != std::string::npos)
           print_line(itr, 0, line_number, funcName, bbid, instid, DMA_STORE);
+        else if (fun->getName().str().find("sin") != std::string::npos)
+          print_line(itr, 0, line_number, funcName, bbid, instid, SINE);
+        else if (fun->getName().str().find("cos") != std::string::npos)
+          print_line(itr, 0, line_number, funcName, bbid, instid, COSINE);
         else
           print_line(itr, 0, line_number, funcName, bbid, instid, opcode);
 
