@@ -696,7 +696,9 @@ bool fullTrace::doInitialization(Module &M)
 
     std::string func_string;
     if (this->my_workload.empty()) {
-      func_string = getenv("WORKLOAD");
+      char* workload = getenv("WORKLOAD");
+      if (workload)
+          func_string = workload;
     } else {
       func_string = this->my_workload;
     }
