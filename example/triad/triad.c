@@ -2,7 +2,7 @@
 
 void triad(int *a,int *b, int *c, int s){
 	int i;
-	for(i=0;i<NUM;i++){
+loop:	for(i=0;i<NUM;i++){
 		c[i] = a[i] + s*b[i];
 	}
 }
@@ -14,7 +14,7 @@ int main(){
     c = (int *) malloc (sizeof(int) * NUM);
 	int i;
   srand(time(NULL));
-	for(i=0; i<NUM; i++){
+init:	for(i=0; i<NUM; i++){
 		c[i] = 0;
 		a[i] = rand();
 		b[i] = rand();

@@ -10,4 +10,5 @@ set(CMAKE_CXX_COMPILER ${CLANGXX})
 
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/full-trace")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/profile-func")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ast-pass")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/example")
