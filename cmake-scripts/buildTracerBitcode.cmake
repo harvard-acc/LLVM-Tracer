@@ -15,12 +15,12 @@ function(build_tracer_bitcode TEST_NAME f_SRC WORKLOAD)
 
   set(FULLTRACE_SO "$<TARGET_FILE:full_trace>")
 
-  set(CFLAGS "-g" "-static" "-O1" "-fno-slp-vectorize" "-fno-vectorize"
+  set(CFLAGS "-g" "-O1" "-fno-slp-vectorize" "-fno-vectorize"
 		"-fno-unroll-loops" "-fno-inline" "-fno-builtin")
 
   set(OPT_FLAGS "-disable-inlining" "-S" "-load=${FULLTRACE_SO}" "-fulltrace")
   set(LLC_FLAGS "-O0" "-disable-fp-elim" "-filetype=asm")
-  set(FINAL_CXX_FLAGS "-static" "-O0" "-fno-inline")
+  set(FINAL_CXX_FLAGS "-O0" "-fno-inline")
   set(FINAL_CXX_LDFLAGS "-lm" "-lz")
 
 
