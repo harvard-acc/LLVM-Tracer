@@ -2,15 +2,19 @@
 #include <map>
 #include <cmath>
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Metadata.h"
+#include "llvm/Support/CommandLine.h"
 #include <cstring>
 #include <cstdlib>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <set>
 #include <sstream>
+#include <sys/stat.h>
 #include "SlotTracker.h"
 #include "full_trace.h"
 
@@ -27,6 +31,10 @@ char s_phi[] = "phi";
 using namespace llvm;
 using namespace std;
 
+cl::opt<string> labelMapFilename("i",
+                                 cl::desc("Specify labelmap filename"),
+                                 cl::value_desc("filename"),
+                                 cl::init("labelmap"));
 namespace {
 
   void split(const std::string &s, const char delim, std::set<std::string> &elems) {
@@ -61,8 +69,25 @@ char list_of_intrinsics[NUM_OF_INTRINSICS]
 
 }// end of anonymous namespace
 
-struct full_traceImpl {
+static Constant *createStringArg(const char *string, Module *curr_module) {
+    Constant *v_string =
+        ConstantDataArray::getString(curr_module->getContext(), string, true);
+    ArrayType *ArrayTy_0 = ArrayType::get(
+        IntegerType::get(curr_module->getContext(), 8), (strlen(string) + 1));
+    GlobalVariable *gvar_array = new GlobalVariable(
+        *curr_module, ArrayTy_0, true, GlobalValue::PrivateLinkage, 0, ".str");
+    gvar_array->setInitializer(v_string);
+    std::vector<Constant *> indices;
+    ConstantInt *zero = ConstantInt::get(curr_module->getContext(),
+                                         APInt(32, StringRef("0"), 10));
+    indices.push_back(zero);
+    indices.push_back(zero);
+    return ConstantExpr::getGetElementPtr(gvar_array, indices);
+}
 
+
+class full_traceImpl {
+  public:
   // External trace_logger function
   Value *TL_log0, *TL_log_int, *TL_log_double;
 
@@ -96,7 +121,7 @@ struct full_traceImpl {
         I64Ty, I64Ty, DoubleTy, I64Ty, I8PtrTy, I64Ty, I8PtrTy, nullptr);
 
     if (func_string.empty()) {
-      std::cerr << "Please set WORKLOAD as an environment variable!\n";
+      errs() << "\n\nPlease set WORKLOAD as an environment variable!\n\n\n";
       return false;
     }
     std::set<std::string> user_workloads;
@@ -230,22 +255,6 @@ struct full_traceImpl {
     return size;
   }
 
-  Constant *createStringArg(char *string) {
-    Constant *v_string =
-        ConstantDataArray::getString(curr_module->getContext(), string, true);
-    ArrayType *ArrayTy_0 = ArrayType::get(
-        IntegerType::get(curr_module->getContext(), 8), (strlen(string) + 1));
-    GlobalVariable *gvar_array = new GlobalVariable(
-        *curr_module, ArrayTy_0, true, GlobalValue::PrivateLinkage, 0, ".str");
-    gvar_array->setInitializer(v_string);
-    std::vector<Constant *> indices;
-    ConstantInt *zero = ConstantInt::get(curr_module->getContext(),
-                                         APInt(32, StringRef("0"), 10));
-    indices.push_back(zero);
-    indices.push_back(zero);
-    return ConstantExpr::getGetElementPtr(gvar_array, indices);
-  }
-
   void createCallForParameterLine(BasicBlock::iterator itr, int line,
                                   int datasize, int datatype = 64,
                                   bool is_reg = 0, char *reg_id = nullptr,
@@ -256,8 +265,8 @@ struct full_traceImpl {
     Value *v_size = ConstantInt::get(IRB.getInt64Ty(), datasize);
     Value *v_is_reg = ConstantInt::get(IRB.getInt64Ty(), is_reg);
     Value *v_is_phi = ConstantInt::get(IRB.getInt64Ty(), is_phi);
-    Constant *vv_reg_id = createStringArg(reg_id);
-    Constant *vv_prev_bbid = createStringArg(prev_bbid);
+    Constant *vv_reg_id = createStringArg(reg_id, curr_module);
+    Constant *vv_prev_bbid = createStringArg(prev_bbid, curr_module);
     ;
     if (value != nullptr) {
       if (datatype == llvm::Type::IntegerTyID) {
@@ -308,9 +317,9 @@ struct full_traceImpl {
           IRB.getInt1Ty(),
           (tracked_functions.find(func_or_reg_id) != tracked_functions.end()));
       v_is_toplevel_mode = ConstantInt::get(IRB.getInt1Ty(), is_toplevel_mode);
-      Constant *vv_func_id = createStringArg(func_or_reg_id);
-      Constant *vv_bb = createStringArg(bbID);
-      Constant *vv_inst = createStringArg(instID);
+      Constant *vv_func_id = createStringArg(func_or_reg_id, curr_module);
+      Constant *vv_bb = createStringArg(bbID, curr_module);
+      Constant *vv_inst = createStringArg(instID, curr_module);
       Value *args[] = { v_linenumber,      vv_func_id, vv_bb,
                         vv_inst,           v_opty,     v_is_tracked_function,
                         v_is_toplevel_mode };
@@ -677,21 +686,17 @@ struct full_traceImpl {
     }
     return false;
   }
-  // runBasicBlock
-}; // end of struct full_traceImpl
+};
 
-fullTrace::fullTrace() : BasicBlockPass(ID)
-{
+fullTrace::fullTrace() : BasicBlockPass(ID) {
     this->Impl = new full_traceImpl();
 }
 
-fullTrace::~fullTrace()
-{
+fullTrace::~fullTrace() {
     delete this->Impl;
 }
 
-bool fullTrace::doInitialization(Module &M)
-{
+bool fullTrace::doInitialization(Module &M) {
     assert(this->Impl);
 
     std::string func_string;
@@ -706,14 +711,69 @@ bool fullTrace::doInitialization(Module &M)
     bool ret = this->Impl->doInitialization(M, func_string);
     return ret;
 }
-bool fullTrace::runOnBasicBlock(BasicBlock &BB)
-{
+
+bool fullTrace::runOnBasicBlock(BasicBlock &BB) {
     assert(this->Impl);
     bool ret = this->Impl->runOnBasicBlock(BB);
     return ret;
 }
 
+LabelMapHandler::LabelMapHandler() : ModulePass(ID) {}
+LabelMapHandler::~LabelMapHandler() {}
+
+bool LabelMapHandler::runOnModule(Module &M) {
+    // Since we only want label maps to be added to the trace once at the very
+    // start, only instrument the module that contains main().
+    Function *main = M.getFunction("main");
+    if (!main)
+        return false;
+
+    bool ret = readLabelMap();
+    if (!ret)
+        return false;
+
+    errs() << "Contents of labelmap:\n" << labelmap_str << "\n";
+    IRBuilder<> builder(main->front().getFirstInsertionPt());
+    Function* labelMapWriter = cast<Function>(M.getOrInsertFunction(
+        "trace_logger_write_labelmap", builder.getVoidTy(),
+        builder.getInt8PtrTy(), builder.getInt64Ty(), nullptr));
+    Value *v_size = ConstantInt::get(builder.getInt64Ty(), labelmap_str.length());
+    Constant *v_buf = createStringArg(labelmap_str.c_str(), &M);
+    Value* args[] = { v_buf, v_size };
+    builder.CreateCall(labelMapWriter, args);
+
+    cleanup();
+    return true;
+}
+
+bool LabelMapHandler::readLabelMap() {
+    std::ifstream file(labelMapFilename, std::ios::binary | std::ios::ate);
+    std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    if (size > 0) {
+        char* labelmap_buf = new char[size+1];
+        file.read(labelmap_buf, size);
+        labelmap_buf[size] = '\0';
+        if (file) {
+            labelmap_str = labelmap_buf;
+        }
+        delete[] labelmap_buf;
+    }
+    file.close();
+    return (labelmap_str.length() != 0);
+}
+
+void LabelMapHandler::cleanup() {
+    struct stat buffer;
+    if (stat(labelMapFilename.c_str(), &buffer) == 0) {
+      std::remove(labelMapFilename.c_str());
+    }
+}
 
 char fullTrace::ID = 0;
+char LabelMapHandler::ID = 0;
 static RegisterPass<fullTrace>
 X("fulltrace", "Add full Tracing Instrumentation for Aladdin", false, false);
+static RegisterPass<LabelMapHandler>
+Y("labelmapwriter", "Read and store label maps into instrumented binary", false, false);

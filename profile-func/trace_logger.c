@@ -11,16 +11,29 @@
 #define RET_OP 1
 
 void trace_logger_init();
+void trace_logger_write_labelmap(char* labelmap_buf, size_t labelmap_size);
 void trace_logger_log0(int line_number, char *name, char *bbid, char *instid,
                        int opcode, bool is_tracked_function, bool is_toplevel_mode);
 void trace_logger_log_label();
 void trace_logger_fin();
 
 gzFile full_trace_file;
-int initp = 0;
+bool initp = false;
 bool track_curr_inst = false;
 bool track_next_inst = false;
 int inst_count = 0;
+
+void trace_logger_write_labelmap(char* labelmap_buf, size_t labelmap_size) {
+    if (!initp) {
+      trace_logger_init();
+      initp = true;
+    }
+    const char* section_header = "%%%% LABEL MAP START %%%%\n";
+    const char* section_footer = "%%%% LABEL MAP END %%%%\n\n";
+    gzwrite(full_trace_file, section_header, strlen(section_header));
+    gzwrite(full_trace_file, labelmap_buf, labelmap_size);
+    gzwrite(full_trace_file, section_footer, strlen(section_footer));
+}
 
 void trace_logger_init() {
   full_trace_file = gzopen("dynamic_trace.gz", "w");
@@ -29,6 +42,7 @@ void trace_logger_init() {
     perror("Failed to open logfile \"dynamic_trace\"");
     exit(-1);
   }
+
   atexit(&trace_logger_fin);
 }
 
@@ -40,7 +54,7 @@ void trace_logger_log0(int line_number, char *name, char *bbid, char *instid,
                        int opcode, bool is_tracked_function, bool is_toplevel_mode) {
   if (!initp) {
     trace_logger_init();
-    initp = 1;
+    initp = true;
   }
 
   if (inst_count == 0 && is_tracked_function)
@@ -85,7 +99,7 @@ void trace_logger_log0(int line_number, char *name, char *bbid, char *instid,
 
 void trace_logger_log_int(int line, int size, int64_t value, int is_reg,
                           char *label, int is_phi, char *prev_bbid) {
-  assert(initp == 1);
+  assert(initp == true);
   if (!track_curr_inst)
     return;
   if (line == RESULT_LINE)
@@ -105,7 +119,7 @@ void trace_logger_log_int(int line, int size, int64_t value, int is_reg,
 }
 void trace_logger_log_double(int line, int size, double value, int is_reg,
                              char *label, int is_phi, char *prev_bbid) {
-  assert(initp == 1);
+  assert(initp == true);
   if (!track_curr_inst)
     return;
   if (line == RESULT_LINE)
