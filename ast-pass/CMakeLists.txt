@@ -13,9 +13,15 @@ add_definitions(
 )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti -std=c++11")
+if (DEBUG)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
+else (DEBUG)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+endif (DEBUG)
 
 set(SOURCE_FILES GetLabeledStmts.cpp)
 add_executable(get-labeled-stmts ${SOURCE_FILES})
+install(TARGETS get-labeled-stmts RUNTIME DESTINATION bin)
 
 target_link_libraries(get-labeled-stmts
   clangFrontend
@@ -60,3 +66,4 @@ target_link_libraries(get-labeled-stmts
     dl
     ${CURSES_LIBRARIES}
 )
+

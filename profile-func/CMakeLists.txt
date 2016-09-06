@@ -10,3 +10,4 @@ else()
 endif()
 
 add_custom_target(PROFILE_FUNC ALL DEPENDS ${FCTS})
+install(FILES ${FCTS}.llvm DESTINATION lib)
