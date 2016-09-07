@@ -6,12 +6,7 @@ function(build_tracer_bitcode TEST_NAME f_SRC WORKLOAD)
   set(FULL_S "${CMAKE_CURRENT_BINARY_DIR}/full.s")
   set(RAW_EXE "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}")
   set(PROFILE_EXE "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}-instrumented")
-
-  if(${BUILD_ON_SOURCE})
-    set(TRACE_LOGGER "${CMAKE_CURRENT_SOURCE_DIR}/../../profile-func/trace_logger.${LLVM_EXT}")
-  else()
-    set(TRACE_LOGGER "${CMAKE_CURRENT_BINARY_DIR}/../../profile-func/trace_logger.${LLVM_EXT}")
-  endif()
+  set(TRACE_LOGGER "${CMAKE_CURRENT_BINARY_DIR}/../../profile-func/trace_logger.${LLVM_EXT}")
 
   set(FULLTRACE_SO "$<TARGET_FILE:full_trace>")
 

@@ -14,18 +14,21 @@ STRING(REPLACE ";" " " CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
 # sets debug level to g3, which contains more infomation than g2.
 # to use it : cmake /where/source/code -DCMAKE_BUILD_TYPE=DEBUG
-set(CMAKE_CXX_FLAGS_DEBUG -g3)
+set(CMAKE_CXX_FLAGS_DEBUG "-g3 -O0")
 
+# Builds an optimized tracer for release.
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
+# If we don't specify a build type, build for release.
+if (CMAKE_BUILD_TYPE STREQUAL "")
+  set (CMAKE_BUILD_TYPE RELEASE)
+endif()
 
 if(NOT DEFINED TEST_CMAKE)
   SET(TEST_CMAKE FALSE)
 endif()
 
 SET(RECOMMAND_LLVM_PREFIX ${CMAKE_BINARY_DIR}/lib/llvm-${LLVM_RECOMMEND_VERSION})
-
-if(NOT DEFINED BUILD_ON_SOURCE)
-  SET(BUILD_ON_SOURCE TRUE)
-endif()
 
 if(NOT DEFINED AUTOINSTALL)
   SET(AUTOINSTALL FALSE)
