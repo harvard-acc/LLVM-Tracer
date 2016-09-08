@@ -20,6 +20,16 @@ void foo(int* x) {
 foo_label: *x = 0;
 }
 
+void nested(int* x) {
+  int i, j;
+outer: for (i = 0; i < 10; i++) {
+  inner: for (j = 0; j < 10; j++) {
+        *x += i;
+        *x += j;
+   }
+  }
+}
+
 int main() {
   int x = 4;
   printf("x = %d\n", x);
@@ -28,6 +38,9 @@ int main() {
   printf("x = %d\n", x);
 
   bar(&x);
+  printf("x = %d\n", x);
+
+  nested(&x);
   printf("x = %d\n", x);
 
   return 0;

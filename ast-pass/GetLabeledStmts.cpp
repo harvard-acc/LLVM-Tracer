@@ -18,6 +18,7 @@
 #include <cstdio>
 #include <fstream>
 #include <map>
+#include <stack>
 #include <sys/stat.h>
 
 #include "clang/AST/AST.h"
@@ -52,7 +53,7 @@ class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
 
   // If the statement is a labeled statement, add it to labelMap.
   void checkIfLabelStmt(Stmt* st, const FunctionDecl* func = nullptr) const {
-    if (!func)
+    if (!func || !st)
       return;
     LabelStmt* labelStmt = dyn_cast<LabelStmt>(st);
     if (labelStmt) {
@@ -60,19 +61,33 @@ class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
       unsigned line = srcManager->getExpansionLineNumber(loc);
       std::string labelName(labelStmt->getName());
       std::string funcName = func->getName().str();
-      auto key = std::make_pair(labelName, funcName);
+      auto key = std::make_pair(funcName, labelName);
       labelMap.insert(std::make_pair(key, line));
     }
   }
 
+  void VisitAllChildStmtsOf(Stmt* stmt, const FunctionDecl* func) const {
+    if (!stmt)
+      return;
+    std::stack<Stmt*> stack;
+    for (Stmt::child_iterator it = stmt->child_begin();
+         it != stmt->child_end(); ++it) {
+      Stmt* childStmt = *it;
+      stack.push(childStmt);
+      checkIfLabelStmt(childStmt, func);
+    }
+    while (!stack.empty()) {
+      Stmt* next = stack.top();
+      VisitAllChildStmtsOf(next, func);
+      stack.pop();
+    }
+  }
+
+  // For each function, recursively find every child label statement.
   virtual bool VisitFunctionDecl(const FunctionDecl* func) const {
     if (func->hasBody()) {
       Stmt* body = func->getBody(func);
-      for (Stmt::child_iterator it = body->child_begin();
-           it != body->child_end(); ++it) {
-        Stmt* childStmt = *it;
-        checkIfLabelStmt(childStmt, func);
-      }
+      VisitAllChildStmtsOf(body, func);
     }
     return true;
   }
