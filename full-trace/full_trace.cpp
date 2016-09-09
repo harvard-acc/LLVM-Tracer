@@ -18,8 +18,6 @@
 #include "SlotTracker.h"
 #include "full_trace.h"
 
-#define NUM_OF_INTRINSICS 35
-#define NUM_OF_LLVM_INTRINSICS 33
 #define RESULT_LINE 19134
 #define FORWARD_LINE 24601
 #define DMA_STORE 98
@@ -45,27 +43,41 @@ namespace {
       }
   }
 
-
-char list_of_intrinsics[NUM_OF_INTRINSICS]
-                       [25] = { "llvm.memcpy", // standard C lib
-                                "llvm.memmove", "llvm.memset", "llvm.sqrt",
-                                "llvm.powi", "llvm.sin", "llvm.cos", "llvm.pow",
-                                "llvm.exp", "llvm.exp2", "llvm.log",
-                                "llvm.log10", "llvm.log2", "llvm.fma",
-                                "llvm.fabs", "llvm.copysign", "llvm.floor",
-                                "llvm.ceil", "llvm.trunc", "llvm.rint",
-                                "llvm.nearbyint", "llvm.round",
-                                "llvm.bswap", // bit manipulation
-                                "llvm.ctpop", "llvm.ctlz", "llvm.cttz",
-                                "llvm.sadd.with.overflow", // arithmetic with
-                                                           // overflow
-                                "llvm.uadd.with.overflow",
-                                "llvm.ssub.with.overflow",
-                                "llvm.usub.with.overflow",
-                                "llvm.smul.with.overflow",
-                                "llvm.umul.with.overflow",
-                                "llvm.fmuladd", // specialised arithmetic
-                                "dmaLoad", "dmaStore", };
+std::vector<std::string> intrinsics = {
+  "llvm.memcpy",  // standard C lib
+  "llvm.memmove",
+  "llvm.memset",
+  "llvm.sqrt",
+  "llvm.powi",
+  "llvm.sin",
+  "llvm.cos",
+  "llvm.pow",
+  "llvm.exp",
+  "llvm.exp2",
+  "llvm.log",
+  "llvm.log10",
+  "llvm.log2",
+  "llvm.fma",
+  "llvm.fabs",
+  "llvm.copysign",
+  "llvm.floor",
+  "llvm.ceil",
+  "llvm.trunc",
+  "llvm.rint",
+  "llvm.nearbyint",
+  "llvm.round",
+  "llvm.bswap",  // bit manipulation
+  "llvm.ctpop",
+  "llvm.ctlz",
+  "llvm.cttz",
+  "llvm.sadd.with.overflow",  // arithmetic with overflow
+  "llvm.uadd.with.overflow",
+  "llvm.ssub.with.overflow",
+  "llvm.usub.with.overflow",
+  "llvm.smul.with.overflow",
+  "llvm.umul.with.overflow",
+  "llvm.fmuladd",  // specialised arithmetic
+};
 
 }// end of anonymous namespace
 
@@ -174,23 +186,17 @@ class full_traceImpl {
     return false;
   }
 
-  int trace_or_not(char *func) {
+  bool trace_or_not(std::string& func) {
     if (is_tracking_function(func))
-      return 1;
-    for (int i = 0; i < NUM_OF_INTRINSICS; i++)
-      if (strstr(func, list_of_intrinsics[i]) == func) {
-        // TODO: Super hacky way of ensuring that dmaLoad and dmaStore always
-        // get tracked (by adding them as llvm intrinsics). We should come up
-        // with a better way of doing this...
-        if (i < NUM_OF_LLVM_INTRINSICS)
-          return i + 2;
-        else
-          return 1;
-      }
-    return -1;
+      return true;
+    for (int i = 0; i < intrinsics.size(); i++) {
+      if (func == intrinsics[i])
+        return true;
+    }
+    return false;
   }
 
-  bool is_tracking_function(string func) {
+  bool is_tracking_function(std::string& func) {
     // perform search in log(n) time.
     std::set<std::string>::iterator it = this->tracked_functions.find(func);
     if (it != this->tracked_functions.end()) {
@@ -257,7 +263,7 @@ class full_traceImpl {
 
   void createCallForParameterLine(BasicBlock::iterator itr, int line,
                                   int datasize, int datatype = 64,
-                                  bool is_reg = 0, char *reg_id = nullptr,
+                                  bool is_reg = 0, const char *reg_id = nullptr,
                                   Value *value = nullptr, bool is_phi = 0,
                                   char *prev_bbid = s_phi) {
     IRBuilder<> IRB(itr);
@@ -298,7 +304,7 @@ class full_traceImpl {
   // s - function ID or register ID or label name
   // opty - opcode or data type
   void print_line(BasicBlock::iterator itr, int line, int line_number,
-                  char *func_or_reg_id, char *bbID, char *instID, int opty,
+                  const char *func_or_reg_id, char *bbID, char *instID, int opty,
                   int datasize = 0, Value *value = nullptr, bool is_reg = 0,
                   char *prev_bbid = s_phi) {
 
@@ -371,10 +377,14 @@ class full_traceImpl {
       fprintf(stderr, "!!This block does not have a name or a ID!\n");
   }
 
+  bool is_dma_function(std::string& funcName) {
+    return (funcName == "dmaLoad" || funcName == "dmaStore");
+  }
+
   virtual bool runOnBasicBlock(BasicBlock &BB) {
     Function *func = BB.getParent();
     int instc = 0;
-    char funcName[256];
+    std::string funcName = func->getName().str();
 
     if (curr_function != func) {
       st->purgeFunction();
@@ -382,9 +392,10 @@ class full_traceImpl {
       curr_function = func;
     }
 
-    strcpy(funcName, curr_function->getName().str().c_str());
-
     if (!is_toplevel_mode && !is_tracking_function(funcName))
+      return false;
+
+    if (is_dma_function(funcName))
       return false;
 
     std::cout << "Tracking function: " << funcName << std::endl;
@@ -406,7 +417,7 @@ class full_traceImpl {
           DILocation Loc(N); // DILocation is in DebugInfo.h
           line_number = Loc.getLineNumber();
         }
-        print_line(insertp, 0, line_number, funcName, bbid, instid, opcode);
+        print_line(insertp, 0, line_number, funcName.c_str(), bbid, instid, opcode);
 
         int num_of_operands = itr->getNumOperands();
 
@@ -494,7 +505,7 @@ class full_traceImpl {
         DILocation Loc(N); // DILocation is in DebugInfo.h
         line_number = Loc.getLineNumber();
       }
-      int callType = 1;
+      bool traceCall = true;
       if (CallInst *I = dyn_cast<CallInst>(itr)) {
         Function *fun = I->getCalledFunction();
         // This is an indirect function invocation (i.e. through function
@@ -503,30 +514,29 @@ class full_traceImpl {
         if (!fun || fun->isIntrinsic())
           continue;
         if (!is_toplevel_mode) {
-          char callfunc[256];
-          strcpy(callfunc, fun->getName().str().c_str());
-          callType = trace_or_not(callfunc);
-          if (callType == -1)
+          std::string callfunc = fun->getName().str();
+          traceCall = trace_or_not(callfunc);
+          if (!traceCall)
             continue;
         }
       }
 
       int num_of_operands = itr->getNumOperands();
       /*Call Instruction*/
-      if (itr->getOpcode() == Instruction::Call && callType == 1) {
+      if (itr->getOpcode() == Instruction::Call && traceCall) {
         CallInst *CI = dyn_cast<CallInst>(itr);
         Function *fun = CI->getCalledFunction();
         strcpy(operR, (char *)fun->getName().str().c_str());
         if (fun->getName().str().find("dmaLoad") != std::string::npos)
-          print_line(itr, 0, line_number, funcName, bbid, instid, DMA_LOAD);
+          print_line(itr, 0, line_number, funcName.c_str(), bbid, instid, DMA_LOAD);
         else if (fun->getName().str().find("dmaStore") != std::string::npos)
-          print_line(itr, 0, line_number, funcName, bbid, instid, DMA_STORE);
+          print_line(itr, 0, line_number, funcName.c_str(), bbid, instid, DMA_STORE);
         else if (fun->getName().str().find("sin") != std::string::npos)
-          print_line(itr, 0, line_number, funcName, bbid, instid, SINE);
+          print_line(itr, 0, line_number, funcName.c_str(), bbid, instid, SINE);
         else if (fun->getName().str().find("cos") != std::string::npos)
-          print_line(itr, 0, line_number, funcName, bbid, instid, COSINE);
+          print_line(itr, 0, line_number, funcName.c_str(), bbid, instid, COSINE);
         else
-          print_line(itr, 0, line_number, funcName, bbid, instid, opcode);
+          print_line(itr, 0, line_number, funcName.c_str(), bbid, instid, opcode);
 
         curr_operand = itr->getOperand(num_of_operands - 1);
         is_reg = curr_operand->hasName();
@@ -612,7 +622,7 @@ class full_traceImpl {
       }
       /*Non-Phi, Non-Call instructions*/
       else {
-        print_line(itr, 0, line_number, funcName, bbid, instid, opcode);
+        print_line(itr, 0, line_number, funcName.c_str(), bbid, instid, opcode);
         if (num_of_operands > 0) {
           for (int i = num_of_operands - 1; i >= 0; i--) {
             curr_operand = itr->getOperand(i);
