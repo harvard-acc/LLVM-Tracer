@@ -43,6 +43,6 @@ class LabelMapHandler : public ModulePass {
 
   private:
     bool readLabelMap();
+    void deleteLabelMap();
     std::string labelmap_str;
-    void cleanup();
 };

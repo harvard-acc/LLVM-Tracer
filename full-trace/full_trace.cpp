@@ -742,7 +742,6 @@ bool LabelMapHandler::runOnModule(Module &M) {
     Value* args[] = { v_buf, v_size };
     builder.CreateCall(labelMapWriter, args);
 
-    cleanup();
     return true;
 }
 
@@ -764,7 +763,7 @@ bool LabelMapHandler::readLabelMap() {
     return (labelmap_str.length() != 0);
 }
 
-void LabelMapHandler::cleanup() {
+void LabelMapHandler::deleteLabelMap() {
     struct stat buffer;
     if (stat(labelMapFilename.c_str(), &buffer) == 0) {
       std::remove(labelMapFilename.c_str());
