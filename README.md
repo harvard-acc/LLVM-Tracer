@@ -1,5 +1,5 @@
-LLVM IR Trace Profiler (LLVM-Tracer) 1.1 Public Release
-============================================
+LLVM IR Trace Profiler (LLVM-Tracer) 1.2
+========================================
 LLVM-Tracer is an LLVM instrumentation pass to print out a dynamic LLVM IR
 trace, including dynamic register values and memory addresses.
 
@@ -11,60 +11,57 @@ Yakun Sophia Shao and David Brooks,
 International Symposium on Performance Analysis of Systems and Software
 (ISPASS), April 2013
 
-============================================
+
 Requirements:
 -------------------
   1. LLVM 3.4 and Clang 3.4 64-bit or LLVM 3.5 and Clang 3.5 64-bit
   2. GCC 4.7 or newer for C++11 features.
-  3. (Optional) CMake 2.8.12 or newer to use the CMake flow.
+  3. CMake 2.8.12 or newer.
 
 Build:
 -----------------
-  LLVM-Tracer currently supports two ways to build.
+**Breaking changes from v1.1 to v1.2:**
 
-  1. Configure with CMake, then build with Make :
+  * CMake is no longer optional. LLVM-Tracer only supports CMake for building.
+    This is because of a new Clangtool component (under `ast-pass/`) which
+    requires CMake.
+  *  LLVM-Tracer will install all built files to the subdirectories `bin/` and
+    `lib/` instead of `full-trace/` and `profile-func/`. The `BUILD_ON_SOURCE`
+    option has been removed.
 
-       If you are familiar with CMake, or you are interested in a script
-       which can build out-of-source and offer automatical LLVM/Clang
-       installation, choose [CMake](#build-with-cmake)
-
-  2. Directly build with Makefile :
-
-       If you want to keep all the things simple, or you do not have
-       CMake, choose [Makefile](#build-with-makefile)
-
-
-Build with CMake:
------------------
   CMake is a configure tool which allows you to out-of-source build.
-  LLVM-Tracer Requires CMake newer than 2.8.12. By default, CMake
+  LLVM-Tracer requires CMake newer than 2.8.12. By default, CMake
   searches for LLVM 3.4.
-
-  Note : In order to being compatiable with legacy work flow,
-  CMake will bulid full-trace/full\_trace.so & profile-func/trace\_logger.llvm
-  under source directory. To turn off, -DBUILD\_ON\_SOURCE=FALSE
 
   1. Set `LLVM_HOME` to where you installed LLVM
      ```
      export LLVM_HOME=/path/to/your/llvm/installation
      ```
 
-  2. Configure with CMake and build LLVM-Tracer source code
+  2. Clone LLVM-Tracer.
 
-     If you have LLVM installed :
      ```
-     mkdir /path/to/build/LLVM-Tracer/
-     cd /path/to/build/LLVM-Tracer/
-     cmake /path/to/LLVM-Tracer/
+     git clone https://github.com/ysshao/LLVM-Tracer
+     cd LLVM-Tracer/
+     ```
+  3. Configure with CMake and build LLVM-Tracer source code.
+
+     If you have LLVM installed:
+     ```
+     mkdir build/
+     cd build
+     cmake ..
      make
+     make install
      ```
 
-     If you want CMake to install LLVM for you. CAUTION : takes an hour!
+     If you want CMake to install LLVM for you (CAUTION: takes an hour!):
      ```
-     mkdir /path/to/build/LLVM-Tracer/
-     cd /path/to/build/LLVM-Tracer/
-     cmake /path/to/LLVM-Tracer/ -DLLVM_ROOT=/where/to/install/LLVM -DAUTOINSTALL=TRUE
+     mkdir build/
+     cd build
+     cmake .. -DLLVM_ROOT=/where/to/install/LLVM -DAUTOINSTALL=TRUE
      make
+     make install
      ```
 
   3. (Optional) Try running triad example, which is built by CMake.
@@ -100,38 +97,8 @@ Build with CMake:
 
      -DCMAKE_BUILD_TYPE=None,Debug,Release    (default : None)
        You can choose one from three of bulid types.
-
-     -DBUILD_ON_SOURCE=TRUE,FALSE    (default : TRUE)
-       By assign this option, CMake will build fulltrace.so &
-       trace_logger.llvm under the source directory.
-       Other llvm bitcode and object files still remain in the build directory.
-
      ```
 
-Build with Makefile:
----------------------
-
-  1. Set `LLVM_HOME` to where you installed LLVM
-     Add LLVM and Clang binary to your PATH:
-
-     ```
-     export LLVM_HOME=/path/to/your/llvm/installation
-     export PATH=$LLVM_HOME/bin:$PATH
-     export LD_LIBRARY_PATH=$LLVM_HOME/lib/:$LD_LIBRARY_PATH
-     ```
-     Also set `GCC_INSTALL_HOME` to where you installed gcc4.7+
-     ```
-     export GCC_INSTALL_HOME=/path/to/your/gcc-4.7-or-up/installation
-     ```
-
-  2. Go to where you put LLVM-Tracer source code
-
-     ```
-     cd /path/to/LLVM-Tracer/full-trace/
-     make
-     cd /path/to/LLVM-Tracer/profile-func/
-     make
-     ```
 
 Run:
 ------
@@ -144,49 +111,66 @@ Example program: triad
   2. Run LLVM-Tracer to generate a dynamic LLVM IR trace
      a. LLVM-Tracer tracks regions of interest inside a program.
         In the triad example, we want to analyze the triad kernel instead of the setup
-        and initialization work done in main.
-        To tell LLVM-Tracer the functions we are
-        interested in, set enviroment variable WORKLOAD to be the function names: 
+        and initialization work done in main. To tell LLVM-Tracer the functions we are
+        interested in, set the enviroment variable WORKLOAD to be the top-level function name:
+
+        ```
         export WORKLOAD=triad
+        ```
 
-    (if you have multiple functions you are interested in, separate with commas):
+        If you have multiple functions you are interested in (which are not
+        called by the top-level function), separate with commas:
 
+        ```
         export WORKLOAD=md,md_kernel
+        ```
 
-     b. Generate LLVM IR:
+     b. Generate the source code labelmap.
 
-        clang -g -O1 -S -fno-slp-vectorize -fno-vectorize -fno-unroll-loops -fno-inline -emit-llvm -o triad.llvm triad.c
-
-     c. Run LLVM-Tracer pass:
-        Before you run, make sure you already built LLVM-Tracer.
-        Set `$TRACER_HOME` to where you put LLVM-Tracer code.
-
-
+        ```
         export TRACER_HOME=/your/path/to/LLVM-Tracer
-        opt -S -load=$TRACER_HOME/full-trace/full_trace.so -fulltrace triad.llvm -o triad-opt.llvm
-        llvm-link -o full.llvm triad-opt.llvm $TRACER_HOME/profile-func/trace_logger.llvm
+        ${TRACER_HOME}/bin/get-labeled-stmts triad.c -- -I${LLVM_HOME}/lib/clang/3.4/include
+        ```
 
+     c. Generate LLVM IR:
 
-     d. Generate machine code:
+        ```
+        clang -g -O1 -S -fno-slp-vectorize -fno-vectorize -fno-unroll-loops -fno-inline -emit-llvm -o triad.llvm triad.c
+        ```
 
+     d. Run LLVM-Tracer pass.
+        Before you run, make sure you already built LLVM-Tracer and have set
+        the environment variable `TRACER_HOME` to where you put LLVM-Tracer
+        code.
 
+        ```
+        opt -S -load=${TRACER_HOME}/full-trace/full_trace.so -fulltrace -labelmapwriter triad.llvm -o triad-opt.llvm
+        llvm-link -o full.llvm triad-opt.llvm ${TRACER_HOME}/profile-func/trace_logger.llvm
+        ```
+
+     e. Generate machine code:
+
+        ```
         llc -filetype=asm -o full.s full.llvm
         gcc -fno-inline -o triad-instrumented full.s
+        ```
 
+     f. Run binary. It will generate a file called `dynamic_trace` under current directory.
 
-     e. Run binary. It will generate a file called `dynamic_trace` under current directory.
+       ```
+       ./triad-instrumented
+       ```
 
-        ./triad-instrumented
+    g. There is a script provided which performs all of these operations.
 
+       ```
+       python llvm_compile.py $TRACER_HOME/example/triad triad
+       ```
 
-     f. We provide a python script to run the above steps automatically for SHOC.
-
-
-        cd /your/path/to/LLVM-Tracer/triad
-        export TRACER_HOME=/your/path/to/LLVM-Tracer
-        python llvm_compile.py $TRACER_HOME/example/triad triad
+`triad` is part of the SHOC benchmark suite. We provide a version of SHOC that
+is ready to be used with LLVM-Tracer. Please go to
+[Aladdin](https://github.com/ysshao/aladdin) and look under the `SHOC`
+directory.
 
 ---------------------------------------------------------------------------------
-Emma Wang and Sophia Shao
-
-Harvard University, 2014
+Sophia Shao, Sam Xi, and Emma Wang
