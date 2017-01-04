@@ -20,6 +20,7 @@
 
 #define RESULT_LINE 19134
 #define FORWARD_LINE 24601
+#define DMA_FENCE 97
 #define DMA_STORE 98
 #define DMA_LOAD 99
 #define SINE 102
@@ -378,7 +379,9 @@ class full_traceImpl {
   }
 
   bool is_dma_function(std::string& funcName) {
-    return (funcName == "dmaLoad" || funcName == "dmaStore");
+    return (funcName == "dmaLoad" ||
+            funcName == "dmaStore" ||
+            funcName == "dmaFence");
   }
 
   virtual bool runOnBasicBlock(BasicBlock &BB) {
@@ -531,6 +534,8 @@ class full_traceImpl {
           print_line(itr, 0, line_number, funcName.c_str(), bbid, instid, DMA_LOAD);
         else if (fun->getName().str().find("dmaStore") != std::string::npos)
           print_line(itr, 0, line_number, funcName.c_str(), bbid, instid, DMA_STORE);
+        else if (fun->getName().str().find("dmaFence") != std::string::npos)
+          print_line(itr, 0, line_number, funcName.c_str(), bbid, instid, DMA_FENCE);
         else if (fun->getName().str().find("sin") != std::string::npos)
           print_line(itr, 0, line_number, funcName.c_str(), bbid, instid, SINE);
         else if (fun->getName().str().find("cos") != std::string::npos)
