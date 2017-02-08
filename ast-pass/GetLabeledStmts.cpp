@@ -51,18 +51,35 @@ class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
       : astContext(&(CI->getASTContext())),
         srcManager(&(CI->getSourceManager())) {}
 
-  // If the statement is a labeled statement, add it to labelMap.
-  void checkIfLabelStmt(Stmt* st, const FunctionDecl* func = nullptr) const {
+
+  // Add a (function,label) -> line number mapping.
+  void addToLabelMap(LabelStmt* labelStmt, Stmt* subStmt,
+                     const FunctionDecl* func) const {
+    SourceLocation loc = subStmt->getLocStart();
+    unsigned line = srcManager->getExpansionLineNumber(loc);
+    std::string labelName(labelStmt->getName());
+    std::string funcName = func->getName().str();
+    auto key = std::make_pair(funcName, labelName);
+    labelMap.insert(std::make_pair(key, line));
+  }
+
+  // Handle a labeled statement, if it is one.
+  //
+  // If the statement is a labeled statement, then find its first non-labeled
+  // substatement, and associate this label with that substatement in the label
+  // map. This ensures that any label will be associated with the next actual
+  // line of code executed, even if that next statement is not on the same line
+  // or if there are other labels in between.
+  void handleIfLabelStmt(Stmt* st, const FunctionDecl* func = nullptr) const {
     if (!func || !st)
       return;
     LabelStmt* labelStmt = dyn_cast<LabelStmt>(st);
     if (labelStmt) {
-      SourceLocation loc = labelStmt->getLocStart();
-      unsigned line = srcManager->getExpansionLineNumber(loc);
-      std::string labelName(labelStmt->getName());
-      std::string funcName = func->getName().str();
-      auto key = std::make_pair(funcName, labelName);
-      labelMap.insert(std::make_pair(key, line));
+      Stmt* subStmt = labelStmt->getSubStmt();
+      while (dyn_cast<LabelStmt>(subStmt)) {
+        subStmt = dyn_cast<LabelStmt>(subStmt)->getSubStmt();
+      }
+      addToLabelMap(labelStmt, subStmt, func);
     }
   }
 
@@ -74,7 +91,7 @@ class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
          it != stmt->child_end(); ++it) {
       Stmt* childStmt = *it;
       stack.push(childStmt);
-      checkIfLabelStmt(childStmt, func);
+      handleIfLabelStmt(childStmt, func);
     }
     while (!stack.empty()) {
       Stmt* next = stack.top();

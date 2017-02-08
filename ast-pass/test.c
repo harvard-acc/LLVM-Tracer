@@ -30,6 +30,16 @@ outer: for (i = 0; i < 10; i++) {
   }
 }
 
+// Here, label_here and label_in_between should all resolve to line 40.
+void different_line(int* x) {
+label_here:
+
+label_in_between:
+// comment in between
+
+  *x = 1;
+}
+
 int main() {
   int x = 4;
   printf("x = %d\n", x);
@@ -41,6 +51,9 @@ int main() {
   printf("x = %d\n", x);
 
   nested(&x);
+  printf("x = %d\n", x);
+
+  different_line(&x);
   printf("x = %d\n", x);
 
   return 0;
