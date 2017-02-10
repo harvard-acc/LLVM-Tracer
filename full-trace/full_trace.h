@@ -52,18 +52,27 @@ class Tracer : public BasicBlockPass {
                                  InstEnv *env);
 
     // s - function ID or register ID or label name
-    // opty - opcode or data type
-    void print_line(BasicBlock::iterator itr, int line, int line_number,
-                    const char *func_or_reg_id, char *bbID, char *instID,
-                    int opty, int datasize = 0, Value *value = nullptr,
-                    bool is_reg = 0, char *prev_bbid = s_phi);
+    //
+    // Insert instrumentation to print one line about this instruction.
+    //
+    // This function inserts a call to TL_log0 (the first line of output for an
+    // instruction), which largely contains information about this
+    // instruction's context: basic block, function, static instruction id,
+    // source line number, etc.
+    void printFirstLine(Instruction *I, int line_number, const char *func_name,
+                        char *bbID, char *instID, unsigned opcode);
 
-    void createCallForParameterLine(BasicBlock::iterator itr, int line,
-                                    int datasize, int datatype = 64,
-                                    bool is_reg = 0,
-                                    const char *reg_id = nullptr,
-                                    Value *value = nullptr, bool is_phi = 0,
-                                    char *prev_bbid = s_phi);
+    // Insert instrumentation to print a line about an instruction's parameters.
+    //
+    // Parameters may be instruction input/output operands, function call
+    // arguments, return values, etc.
+    //
+    // Based on the value of datatype, this function inserts calls to
+    // TL_log_int or TL_log_double.
+    void printParamLine(Instruction *I, int param_num, const char *reg_id,
+                        const char *bbId, Type::TypeID datatype,
+                        unsigned datasize, Value *value, bool is_reg,
+                        const char *prev_bbid = s_phi, bool is_phi = false);
 
     // Should we trace this function or not?
     bool trace_or_not(std::string& func);
