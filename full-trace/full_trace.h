@@ -14,12 +14,14 @@ struct InstEnv {
   public:
     InstEnv() : line_number(-1), instc(0) {}
 
+    enum { BUF_SIZE = 256 };
+
     // Function name.
-    char funcName[256];
+    char funcName[BUF_SIZE];
     // Basic block ID. See getBBId().
-    char bbid[256];
+    char bbid[BUF_SIZE];
     // Static instruction ID. See getInstId().
-    char instid[256];
+    char instid[BUF_SIZE];
     // Source line number.
     int line_number;
     // Static instruction count within this basic block.
@@ -51,16 +53,13 @@ class Tracer : public BasicBlockPass {
     void handleInstructionResult(Instruction *inst, Instruction *next_inst,
                                  InstEnv *env);
 
-    // s - function ID or register ID or label name
-    //
     // Insert instrumentation to print one line about this instruction.
     //
     // This function inserts a call to TL_log0 (the first line of output for an
     // instruction), which largely contains information about this
     // instruction's context: basic block, function, static instruction id,
     // source line number, etc.
-    void printFirstLine(Instruction *I, int line_number, const char *func_name,
-                        char *bbID, char *instID, unsigned opcode);
+    void printFirstLine(Instruction *insert_point, InstEnv *env, unsigned opcode);
 
     // Insert instrumentation to print a line about an instruction's parameters.
     //

@@ -210,7 +210,7 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
     handlePhiNodes(&BB, instc, func);
 
   InstEnv env;
-  strncpy(env.funcName, funcName.c_str(), 256);
+  strncpy(env.funcName, funcName.c_str(), InstEnv::BUF_SIZE);
 
   // From this point onwards, nodes cannot be PHI nodes.
   BasicBlock::iterator nextitr;
@@ -379,25 +379,23 @@ void Tracer::printParamLine(Instruction *I, int param_num, const char *reg_id,
   }
 }
 
-void Tracer::printFirstLine(Instruction *I, int line_number,
-                            const char *func_name, char *bbID, char *instID,
-                            unsigned opcode) {
+void Tracer::printFirstLine(Instruction *I, InstEnv *env, unsigned opcode) {
   IRBuilder<> IRB(I);
   Value *v_opty, *v_linenumber, *v_is_tracked_function,
       *v_is_toplevel_mode;
   v_opty = ConstantInt::get(IRB.getInt64Ty(), opcode);
-  v_linenumber = ConstantInt::get(IRB.getInt64Ty(), line_number);
+  v_linenumber = ConstantInt::get(IRB.getInt64Ty(), env->line_number);
 
   // These two parameters are passed so the instrumented binary can be run
   // completely standalone (does not need the WORKLOAD env variable
   // defined).
   v_is_tracked_function = ConstantInt::get(
       IRB.getInt1Ty(),
-      (tracked_functions.find(func_name) != tracked_functions.end()));
+      (tracked_functions.find(env->funcName) != tracked_functions.end()));
   v_is_toplevel_mode = ConstantInt::get(IRB.getInt1Ty(), is_toplevel_mode);
-  Constant *vv_func_name = createStringArg(func_name, curr_module);
-  Constant *vv_bb = createStringArg(bbID, curr_module);
-  Constant *vv_inst = createStringArg(instID, curr_module);
+  Constant *vv_func_name = createStringArg(env->funcName, curr_module);
+  Constant *vv_bb = createStringArg(env->bbid, curr_module);
+  Constant *vv_inst = createStringArg(env->instid, curr_module);
   Value *args[] = { v_linenumber,      vv_func_name, vv_bb,
                     vv_inst,           v_opty,       v_is_tracked_function,
                     v_is_toplevel_mode };
@@ -451,21 +449,21 @@ void Tracer::handlePhiNodes(BasicBlock* BB, int& instc, Function* func) {
   BasicBlock::iterator insertp = BB->getFirstInsertionPt();
   std::string funcName = BB->getParent()->getName().str();
 
+  InstEnv env;
+  strncpy(env.funcName, funcName.c_str(), InstEnv::BUF_SIZE);
   for (BasicBlock::iterator itr = BB->begin(); isa<PHINode>(itr); itr++) {
     Value *curr_operand = nullptr;
     bool is_reg = false;
-    char bbid[256], instid[256], operR[256];
-    int line_number = -1;
+    char instid[256], operR[256];
 
-    getBBId(BB, bbid);
-    getInstId(itr, bbid, instid, instc);
+    getBBId(BB, env.bbid);
+    getInstId(itr, env.bbid, env.instid, env.instc);
 
     if (MDNode *N = itr->getMetadata("dbg")) {
       DILocation Loc(N); // DILocation is in DebugInfo.h
-      line_number = Loc.getLineNumber();
+      env.line_number = Loc.getLineNumber();
     }
-    printFirstLine(insertp, line_number, funcName.c_str(), bbid, instid,
-                   itr->getOpcode());
+    printFirstLine(insertp, &env, itr->getOpcode());
 
     int num_of_operands = itr->getNumOperands();
 
@@ -511,17 +509,17 @@ void Tracer::handlePhiNodes(BasicBlock* BB, int& instc, Function* func) {
         }
       }
     }
-    /*Print result line*/
+    // Print result line.
     if (!itr->getType()->isVoidTy()) {
       is_reg = 1;
       if (itr->getType()->isVectorTy()) {
-        printParamLine(insertp, RESULT_LINE, instid, nullptr,
+        printParamLine(insertp, RESULT_LINE, env.instid, nullptr,
                        itr->getType()->getTypeID(), getMemSize(itr->getType()),
                        nullptr, is_reg);
       } else if (itr->isTerminator())
         fprintf(stderr, "It is terminator...\n");
       else {
-        printParamLine(insertp, RESULT_LINE, instid, nullptr,
+        printParamLine(insertp, RESULT_LINE, env.instid, nullptr,
                        itr->getType()->getTypeID(), getMemSize(itr->getType()),
                        itr, is_reg);
       }
@@ -549,8 +547,7 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
   else
     opcode = inst->getOpcode();
 
-  printFirstLine(inst, env->line_number, env->funcName, env->bbid, env->instid,
-                 opcode);
+  printFirstLine(inst, env, opcode);
 
   int num_of_operands = inst->getNumOperands();
   Value* curr_operand = inst->getOperand(num_of_operands - 1);
@@ -637,8 +634,7 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
 
 void Tracer::handleNonPhiNonCallInstruction(Instruction *inst, InstEnv* env) {
   char operR[256];
-  printFirstLine(inst, env->line_number, env->funcName, env->bbid, env->instid,
-                 inst->getOpcode());
+  printFirstLine(inst, env, inst->getOpcode());
   int num_of_operands = inst->getNumOperands();
   if (num_of_operands > 0) {
     for (int i = num_of_operands - 1; i >= 0; i--) {
