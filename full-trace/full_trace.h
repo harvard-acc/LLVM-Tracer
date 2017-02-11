@@ -9,7 +9,7 @@
 extern char s_phi[];
 
 // Computed properties of an instruction commonly used by this pass's
-// handling functions, regardless of what kind of instruction this is.
+// handling functions.
 struct InstEnv {
   public:
     InstEnv() : line_number(-1), instc(0) {}
@@ -47,11 +47,14 @@ class Tracer : public BasicBlockPass {
 
   private:
     // Instrumentation functions for different types of nodes.
-    void handlePhiNodes(BasicBlock *BB, int &instc, Function *func);
+    void handlePhiNodes(BasicBlock *BB, InstEnv *env);
     void handleCallInstruction(Instruction *inst, InstEnv *env);
     void handleNonPhiNonCallInstruction(Instruction *inst, InstEnv *env);
     void handleInstructionResult(Instruction *inst, Instruction *next_inst,
                                  InstEnv *env);
+
+    // Set line number information in env for this inst if it is found.
+    void setLineNumberIfExists(Instruction *I, InstEnv *env);
 
     // Insert instrumentation to print one line about this instruction.
     //
@@ -85,12 +88,24 @@ class Tracer : public BasicBlockPass {
 
     // Construct an ID for the given instruction.
     //
-    // Store the value in instid.
-    bool getInstId(Instruction *itr, char *bbid, char *instid, int &instc);
+    // If the instruction produces a value in a register, this ID is set to the
+    // name of the variable that contains the result or the local slot number
+    // of the register, and this function returns true.
+    //
+    // If the instruction does not produce a value, an artificial ID is
+    // constructed by concatenating the given bbid, which both must not be NULL
+    // and the current instc.
+    //
+    // The ID is returned as a string in instid.
+    bool getInstId(Instruction *I, char *bbid, char *instid, int *instc);
 
     // Construct an ID for the given basic block.
     //
-    // Store the value in bbid.
+    // This ID is either the name of the basic block (e.g. ".lr.ph",
+    // "_crit_edge") or the local slot number (which would appear in the IR as
+    // "; <label>:N".
+    //
+    // The ID is stored as a string in bbid.
     void getBBId(Value *BB, char *bbid);
 
     // References to the logging functions.

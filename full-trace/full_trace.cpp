@@ -185,8 +185,9 @@ bool Tracer::doInitialization(Module &M) {
 
 bool Tracer::runOnBasicBlock(BasicBlock &BB) {
   Function *func = BB.getParent();
-  int instc = 0;
   std::string funcName = func->getName().str();
+  InstEnv env;
+  strncpy(env.funcName, funcName.c_str(), InstEnv::BUF_SIZE);
 
   if (curr_function != func) {
     st->purgeFunction();
@@ -207,10 +208,7 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
 
   BasicBlock::iterator itr = BB.begin();
   if (isa<PHINode>(itr))
-    handlePhiNodes(&BB, instc, func);
-
-  InstEnv env;
-  strncpy(env.funcName, funcName.c_str(), InstEnv::BUF_SIZE);
+    handlePhiNodes(&BB, &env);
 
   // From this point onwards, nodes cannot be PHI nodes.
   BasicBlock::iterator nextitr;
@@ -221,14 +219,8 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
     // Get static BasicBlock ID: produce bbid
     getBBId(&BB, env.bbid);
     // Get static instruction ID: produce instid
-    getInstId(itr, env.bbid, env.instid, env.instc);
-
-    if (MDNode *N = itr->getMetadata("dbg")) {
-      DILocation Loc(N); // DILocation is in DebugInfo.h
-      env.line_number = Loc.getLineNumber();
-    } else {
-      env.line_number = -1;
-    }
+    getInstId(itr, env.bbid, env.instid, &env.instc);
+    setLineNumberIfExists(itr, &env);
 
     bool traceCall = true;
     if (CallInst *I = dyn_cast<CallInst>(itr)) {
@@ -402,25 +394,24 @@ void Tracer::printFirstLine(Instruction *I, InstEnv *env, unsigned opcode) {
   IRB.CreateCall(TL_log0, args);
 }
 
-bool Tracer::getInstId(Instruction *itr, char *bbid, char *instid, int &instc) {
-  int id = st->getLocalSlot(itr);
-  bool has_name = itr->hasName();
+bool Tracer::getInstId(Instruction *I, char *bbid, char *instid, int *instc) {
+  int id = st->getLocalSlot(I);
+  bool has_name = I->hasName();
   if (has_name) {
-    strcpy(instid, (char *)itr->getName().str().c_str());
+    strcpy(instid, (char *)I->getName().str().c_str());
     return true;
   }
   if (!has_name && id >= 0) {
     sprintf(instid, "%d", id);
     return true;
-  } else if (!has_name && id == -1) {
-    char tmp[10];
-    char dash[5] = "-";
-    sprintf(tmp, "%d", instc);
-    if (bbid != nullptr)
-      strcpy(instid, bbid);
-    strcat(instid, dash);
-    strcat(instid, tmp);
-    instc++;
+  }
+  if (!has_name && id == -1) {
+    // This instruction does not produce a value in a new register.
+    // Examples include branches, stores, calls, returns.
+    // instid is constructed using the bbid and a monotonically increasing
+    // instruction count.
+    sprintf(instid, "%s-%d", bbid, *instc);
+    (*instc)++;
     return true;
   }
   return false;
@@ -434,8 +425,9 @@ void Tracer::getBBId(Value *BB, char *bbid) {
     strcpy(bbid, (char *)BB->getName().str().c_str());
   if (!hasName && id >= 0)
     sprintf(bbid, "%d", id);
-  else if (!hasName && id == -1)
-    fprintf(stderr, "!!This block does not have a name or a ID!\n");
+  // Something went wrong.
+  assert((hasName || id != -1) &&
+         "This basic block does not have a name or a ID!\n");
 }
 
 bool Tracer::is_dma_function(std::string& funcName) {
@@ -444,26 +436,29 @@ bool Tracer::is_dma_function(std::string& funcName) {
           funcName == "dmaFence");
 }
 
-// Handle all phi nodes at the beginning of a basic block.
-void Tracer::handlePhiNodes(BasicBlock* BB, int& instc, Function* func) {
-  BasicBlock::iterator insertp = BB->getFirstInsertionPt();
-  std::string funcName = BB->getParent()->getName().str();
+void Tracer::setLineNumberIfExists(Instruction *I, InstEnv *env) {
+  if (MDNode *N = I->getMetadata("dbg")) {
+    DILocation Loc(N); // DILocation is in DebugInfo.h
+    env->line_number = Loc.getLineNumber();
+  } else {
+    env->line_number = -1;
+  }
+}
 
-  InstEnv env;
-  strncpy(env.funcName, funcName.c_str(), InstEnv::BUF_SIZE);
+// Handle all phi nodes at the beginning of a basic block.
+void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
+  BasicBlock::iterator insertp = BB->getFirstInsertionPt();
+
   for (BasicBlock::iterator itr = BB->begin(); isa<PHINode>(itr); itr++) {
     Value *curr_operand = nullptr;
     bool is_reg = false;
-    char instid[256], operR[256];
+    char operR[256];
 
-    getBBId(BB, env.bbid);
-    getInstId(itr, env.bbid, env.instid, env.instc);
+    getBBId(BB, env->bbid);
+    getInstId(itr, env->bbid, env->instid, &env->instc);
+    setLineNumberIfExists(itr, env);
 
-    if (MDNode *N = itr->getMetadata("dbg")) {
-      DILocation Loc(N); // DILocation is in DebugInfo.h
-      env.line_number = Loc.getLineNumber();
-    }
-    printFirstLine(insertp, &env, itr->getOpcode());
+    printFirstLine(insertp, env, itr->getOpcode());
 
     int num_of_operands = itr->getNumOperands();
 
@@ -480,7 +475,7 @@ void Tracer::handlePhiNodes(BasicBlock* BB, int& instc, Function* func) {
 
         if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
           int flag = 0;
-          is_reg = getInstId(I, nullptr, operR, flag);
+          is_reg = getInstId(I, nullptr, operR, &flag);
           assert(flag == 0);
           if (curr_operand->getType()->isVectorTy()) {
             printParamLine(insertp, i + 1, operR, s_phi,
@@ -513,13 +508,13 @@ void Tracer::handlePhiNodes(BasicBlock* BB, int& instc, Function* func) {
     if (!itr->getType()->isVoidTy()) {
       is_reg = 1;
       if (itr->getType()->isVectorTy()) {
-        printParamLine(insertp, RESULT_LINE, env.instid, nullptr,
+        printParamLine(insertp, RESULT_LINE, env->instid, nullptr,
                        itr->getType()->getTypeID(), getMemSize(itr->getType()),
                        nullptr, is_reg);
       } else if (itr->isTerminator())
         fprintf(stderr, "It is terminator...\n");
       else {
-        printParamLine(insertp, RESULT_LINE, env.instid, nullptr,
+        printParamLine(insertp, RESULT_LINE, env->instid, nullptr,
                        itr->getType()->getTypeID(), getMemSize(itr->getType()),
                        itr, is_reg);
       }
@@ -569,7 +564,7 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
     is_reg = curr_operand->hasName();
     if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
       int flag = 0;
-      is_reg = getInstId(I, nullptr, operR, flag);
+      is_reg = getInstId(I, nullptr, operR, &flag);
       assert(flag == 0);
       if (curr_operand->getType()->isVectorTy()) {
         printParamLine(inst, call_id + 1, operR, nullptr,
@@ -644,7 +639,7 @@ void Tracer::handleNonPhiNonCallInstruction(Instruction *inst, InstEnv* env) {
       // for instructions using registers
       if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
         int flag = 0;
-        is_reg = getInstId(I, nullptr, operR, flag);
+        is_reg = getInstId(I, nullptr, operR, &flag);
         assert(flag == 0);
         if (curr_operand->getType()->isVectorTy()) {
           printParamLine(inst, i + 1, operR, nullptr,
