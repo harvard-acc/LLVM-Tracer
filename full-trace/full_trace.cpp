@@ -327,15 +327,18 @@ int Tracer::getMemSize(Type *T) {
   return size;
 }
 
+void Tracer::printParamLine(Instruction *I, InstOperandParams *params) {
+  printParamLine(I, params->param_num, params->reg_id, params->bbid,
+                 params->datatype, params->datasize, params->value,
+                 params->is_reg, params->prev_bbid);
+}
+
 void Tracer::printParamLine(Instruction *I, int param_num, const char *reg_id,
                             const char *bbId, Type::TypeID datatype,
                             unsigned datasize, Value *value, bool is_reg,
-                            const char *prev_bbid, bool is_phi) {
-  // Print parameter/result line.
-
-  if (bbId != nullptr && strcmp(bbId, "phi") == 0)
-    is_phi = true;
+                            const char *prev_bbid) {
   IRBuilder<> IRB(I);
+  bool is_phi = (bbId != nullptr && strcmp(bbId, "phi") == 0);
   Value *v_param_num = ConstantInt::get(IRB.getInt64Ty(), param_num);
   Value *v_size = ConstantInt::get(IRB.getInt64Ty(), datasize);
   Value *v_is_reg = ConstantInt::get(IRB.getInt64Ty(), is_reg);
@@ -449,10 +452,16 @@ void Tracer::setLineNumberIfExists(Instruction *I, InstEnv *env) {
 void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
   BasicBlock::iterator insertp = BB->getFirstInsertionPt();
 
+  char prev_bbid[InstEnv::BUF_SIZE];
+  char operR[InstEnv::BUF_SIZE];
+
   for (BasicBlock::iterator itr = BB->begin(); isa<PHINode>(itr); itr++) {
+    InstOperandParams params;
+    params.prev_bbid = prev_bbid;
+    params.reg_id = operR;
+    params.bbid = s_phi;
+
     Value *curr_operand = nullptr;
-    bool is_reg = false;
-    char operR[256];
 
     getBBId(BB, env->bbid);
     getInstId(itr, env->bbid, env->instid, &env->instc);
@@ -460,64 +469,59 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
 
     printFirstLine(insertp, env, itr->getOpcode());
 
+    // Print each operand.
     int num_of_operands = itr->getNumOperands();
-
-    /*Print each operand*/
     if (num_of_operands > 0) {
       for (int i = num_of_operands - 1; i >= 0; i--) {
-
         BasicBlock *prev_bblock =
             (dyn_cast<PHINode>(itr))->getIncomingBlock(i);
-        char prev_bbid[256];
-        getBBId(prev_bblock, prev_bbid);
+        getBBId(prev_bblock, params.prev_bbid);
         curr_operand = itr->getOperand(i);
-        is_reg = curr_operand->hasName();
+        params.param_num = i + 1;
+        params.datatype = curr_operand->getType()->getTypeID();
+        params.datasize = getMemSize(curr_operand->getType());
 
         if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
           int flag = 0;
-          is_reg = getInstId(I, nullptr, operR, &flag);
+          params.value = nullptr;
+          params.is_reg = getInstId(I, nullptr, params.reg_id, &flag);
           assert(flag == 0);
           if (curr_operand->getType()->isVectorTy()) {
-            printParamLine(insertp, i + 1, operR, s_phi,
-                           curr_operand->getType()->getTypeID(),
-                           getMemSize(curr_operand->getType()), nullptr, is_reg,
-                           prev_bbid);
+            // Nothing else to do.
           } else {
-            printParamLine(insertp, i + 1, operR, s_phi,
-                           I->getType()->getTypeID(), getMemSize(I->getType()),
-                           nullptr, is_reg, prev_bbid);
+            // Use the instruction's datatype/datasize instead.
+            params.datatype = I->getType()->getTypeID();
+            params.datasize = getMemSize(I->getType());
           }
-        } else if (curr_operand->getType()->isVectorTy()) {
-          char operand_id[256];
-          strcpy(operand_id, curr_operand->getName().str().c_str());
-          printParamLine(insertp, i + 1, operand_id, s_phi,
-                         curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), nullptr, is_reg,
-                         prev_bbid);
         } else {
-          char operand_id[256];
-          strcpy(operand_id, curr_operand->getName().str().c_str());
-          printParamLine(insertp, i + 1, operand_id, s_phi,
-                         curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), curr_operand,
-                         is_reg, prev_bbid);
+          params.is_reg = curr_operand->hasName();
+          strcpy(params.reg_id, curr_operand->getName().str().c_str());
+          if (curr_operand->getType()->isVectorTy()) {
+            // Nothing else to do.
+          } else {
+            params.value = curr_operand;
+          }
         }
+        printParamLine(insertp, &params);
       }
     }
+
     // Print result line.
     if (!itr->getType()->isVoidTy()) {
-      is_reg = 1;
+      params.is_reg = true;
+      params.param_num = RESULT_LINE;
+      params.reg_id = env->instid;
+      params.bbid = nullptr;
+      params.datatype = itr->getType()->getTypeID();
+      params.datasize = getMemSize(itr->getType());
       if (itr->getType()->isVectorTy()) {
-        printParamLine(insertp, RESULT_LINE, env->instid, nullptr,
-                       itr->getType()->getTypeID(), getMemSize(itr->getType()),
-                       nullptr, is_reg);
-      } else if (itr->isTerminator())
-        fprintf(stderr, "It is terminator...\n");
-      else {
-        printParamLine(insertp, RESULT_LINE, env->instid, nullptr,
-                       itr->getType()->getTypeID(), getMemSize(itr->getType()),
-                       itr, is_reg);
+        params.value = nullptr;
+      } else if (itr->isTerminator()) {
+        assert(false && "It is terminator...\n");
+      } else {
+        params.value = itr;
       }
+      printParamLine(insertp, &params);
     }
   }
 }

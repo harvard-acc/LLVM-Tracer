@@ -28,6 +28,27 @@ struct InstEnv {
     int instc;
 };
 
+struct InstOperandParams {
+  public:
+    InstOperandParams()
+        : param_num(-1), datatype(Type::VoidTyID), datasize(0), is_reg(true) {}
+
+    // Operand index (first, second, etc).
+    int param_num;
+    // Datatype.
+    Type::TypeID datatype;
+    // Bitwidth of this operand.
+    unsigned datasize;
+    // This operand was stored in a register.
+    bool is_reg;
+    // Value of this operand, if it has one. PHI nodes generally do not have values.
+    Value* value;
+
+    char *reg_id;
+    char *bbid;
+    char *prev_bbid;
+};
+
 class Tracer : public BasicBlockPass {
   public:
     Tracer();
@@ -74,7 +95,9 @@ class Tracer : public BasicBlockPass {
     void printParamLine(Instruction *I, int param_num, const char *reg_id,
                         const char *bbId, Type::TypeID datatype,
                         unsigned datasize, Value *value, bool is_reg,
-                        const char *prev_bbid = s_phi, bool is_phi = false);
+                        const char *prev_bbid = s_phi);
+
+    void printParamLine(Instruction *I, InstOperandParams *params);
 
     // Should we trace this function or not?
     bool trace_or_not(std::string& func);
