@@ -219,7 +219,7 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
     // Get static BasicBlock ID: produce bbid
     getBBId(&BB, env.bbid);
     // Get static instruction ID: produce instid
-    getInstId(itr, env.bbid, env.instid, &env.instc);
+    getInstId(itr, &env);
     setLineNumberIfExists(itr, &env);
 
     bool traceCall = true;
@@ -397,9 +397,22 @@ void Tracer::printFirstLine(Instruction *I, InstEnv *env, unsigned opcode) {
   IRB.CreateCall(TL_log0, args);
 }
 
+bool Tracer::getInstId(Instruction *I, InstEnv* env) {
+  return getInstId(I, env->bbid, env->instid, &(env->instc));
+}
+
+bool Tracer::setOperandNameAndReg(Instruction *I, InstOperandParams *params) {
+  // This instruction operand must have a name or a local slot. If it does not,
+  // then it will try to construct an artificial name, which will fail because
+  // bbid and instc are NULL.
+  params->is_reg = getInstId(I, nullptr, params->operand_name, nullptr);
+  return params->is_reg;
+}
+
 bool Tracer::getInstId(Instruction *I, char *bbid, char *instid, int *instc) {
   int id = st->getLocalSlot(I);
   bool has_name = I->hasName();
+  assert(instid != nullptr);
   if (has_name) {
     strcpy(instid, (char *)I->getName().str().c_str());
     return true;
@@ -413,6 +426,7 @@ bool Tracer::getInstId(Instruction *I, char *bbid, char *instid, int *instc) {
     // Examples include branches, stores, calls, returns.
     // instid is constructed using the bbid and a monotonically increasing
     // instruction count.
+    assert(bbid != nullptr && instc != nullptr);
     sprintf(instid, "%s-%d", bbid, *instc);
     (*instc)++;
     return true;
@@ -464,7 +478,7 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
     Value *curr_operand = nullptr;
 
     getBBId(BB, env->bbid);
-    getInstId(itr, env->bbid, env->instid, &env->instc);
+    getInstId(itr, env);
     setLineNumberIfExists(itr, env);
 
     printFirstLine(insertp, env, itr->getOpcode());
@@ -481,10 +495,8 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
         params.setDataTypeAndSize(curr_operand);
 
         if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
-          int flag = 0;
+          setOperandNameAndReg(I, &params);
           params.value = nullptr;
-          params.is_reg = getInstId(I, nullptr, params.operand_name, &flag);
-          assert(flag == 0);
           if (curr_operand->getType()->isVectorTy()) {
             // Nothing else to do.
           } else {
@@ -590,12 +602,7 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
     if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
       // This operand was produced by an instruction in this basic block (and
       // that instruction could be a phi node).
-
-      // TODO: Using an indirect way to ensure this instruction either has a
-      // name or a local slot is ugly.
-      int flag = 0;
-      caller.is_reg = getInstId(I, caller.bbid, caller.operand_name, &flag);
-      assert(flag == 0);
+      setOperandNameAndReg(I, &caller);
 
       if (curr_operand->getType()->isVectorTy()) {
         // Nothing else to do. We don't want to print the value of a vector type.
@@ -652,9 +659,7 @@ void Tracer::handleNonPhiNonCallInstruction(Instruction *inst, InstEnv* env) {
       strcpy(params.operand_name, curr_operand->getName().str().c_str());
 
       if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
-        int flag = 0;
-        params.is_reg = getInstId(I, nullptr, params.operand_name, &flag);
-        assert(flag == 0);
+        setOperandNameAndReg(I, &params);
         if (curr_operand->getType()->isVectorTy()) {
           // Nothing more to do.
         } else {

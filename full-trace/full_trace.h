@@ -135,6 +135,12 @@ class Tracer : public BasicBlockPass {
     // The ID is returned as a string in instid.
     bool getInstId(Instruction *I, char *bbid, char *instid, int *instc);
 
+    // Construct an ID using the given instruction and environment.
+    bool getInstId(Instruction *I, InstEnv *env);
+
+    // Get and set the operand name for this instruction.
+    bool setOperandNameAndReg(Instruction *I, InstOperandParams *params);
+
     // Construct an ID for the given basic block.
     //
     // This ID is either the name of the basic block (e.g. ".lr.ph",
