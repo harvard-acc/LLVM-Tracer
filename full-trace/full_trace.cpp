@@ -637,75 +637,63 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
 }
 
 void Tracer::handleNonPhiNonCallInstruction(Instruction *inst, InstEnv* env) {
-  char operR[256];
+  char op_name[256];
   printFirstLine(inst, env, inst->getOpcode());
   int num_of_operands = inst->getNumOperands();
   if (num_of_operands > 0) {
     for (int i = num_of_operands - 1; i >= 0; i--) {
       Value* curr_operand = inst->getOperand(i);
-      bool is_reg = curr_operand->hasName();
 
-      // for instructions using registers
+      InstOperandParams params;
+      params.param_num = i + 1;
+      params.operand_name = op_name;
+      params.setDataTypeAndSize(curr_operand);
+      params.is_reg = curr_operand->hasName();
+      strcpy(params.operand_name, curr_operand->getName().str().c_str());
+
       if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
         int flag = 0;
-        is_reg = getInstId(I, nullptr, operR, &flag);
+        params.is_reg = getInstId(I, nullptr, params.operand_name, &flag);
         assert(flag == 0);
         if (curr_operand->getType()->isVectorTy()) {
-          printParamLine(inst, i + 1, operR, nullptr,
-                         curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), nullptr, is_reg);
+          // Nothing more to do.
         } else {
-          printParamLine(inst, i + 1, operR, nullptr, I->getType()->getTypeID(),
-                         getMemSize(I->getType()), curr_operand, is_reg);
+          params.value = curr_operand;
         }
       } else {
         if (curr_operand->getType()->isVectorTy()) {
-          char operand_id[256];
-          strcpy(operand_id, curr_operand->getName().str().c_str());
-          printParamLine(inst, i + 1, operand_id, nullptr,
-                         curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), nullptr, is_reg);
+          // Nothing more to do.
         } else if (curr_operand->getType()->isLabelTy()) {
-          char label_id[256];
-          getBBId(curr_operand, label_id);
-          printParamLine(inst, i + 1, label_id, nullptr,
-                         curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), nullptr, true);
-        }
-        // is function
-        else if (curr_operand->getValueID() == 2) {
-          char func_id[256];
-          strcpy(func_id, curr_operand->getName().str().c_str());
-          printParamLine(inst, i + 1, func_id, nullptr,
-                         curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), nullptr, is_reg);
+          getBBId(curr_operand, params.operand_name);
+          params.is_reg = true;
+        } else if (curr_operand->getValueID() == Value::FunctionVal) {
+          // TODO: Replace this with an isa<> check instead.
+          // Nothing more to do.
         } else {
-          char operand_id[256];
-          strcpy(operand_id, curr_operand->getName().str().c_str());
-          printParamLine(inst, i + 1, operand_id, nullptr,
-                         curr_operand->getType()->getTypeID(),
-                         getMemSize(curr_operand->getType()), curr_operand,
-                         is_reg);
+          params.value = curr_operand;
         }
       }
+      printParamLine(inst, &params);
     }
   }
 }
 
 void Tracer::handleInstructionResult(Instruction *inst, Instruction *next_inst,
                                      InstEnv *env) {
-  bool is_reg = true;
+  InstOperandParams params;
+  params.param_num = RESULT_LINE;
+  params.is_reg = true;
+  params.operand_name = env->instid;
+  params.bbid = nullptr;
+  params.setDataTypeAndSize(inst);
   if (inst->getType()->isVectorTy()) {
-    printParamLine(next_inst, RESULT_LINE, env->instid, nullptr,
-                   inst->getType()->getTypeID(), getMemSize(inst->getType()),
-                   nullptr, is_reg);
-  } else if (inst->isTerminator())
-    printf("It is terminator...\n");
-  else {
-    printParamLine(next_inst, RESULT_LINE, env->instid, nullptr,
-                   inst->getType()->getTypeID(), getMemSize(inst->getType()),
-                   inst, is_reg);
+    // Nothing more to do.
+  } else if (inst->isTerminator()) {
+    assert(false && "Return instruction is terminator...\n");
+  } else {
+    params.value = inst;
   }
+  printParamLine(next_inst, &params);
 }
 
 LabelMapHandler::LabelMapHandler() : ModulePass(ID) {}
