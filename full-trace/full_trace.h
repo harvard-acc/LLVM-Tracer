@@ -8,6 +8,9 @@
 
 extern char s_phi[];
 
+// Get the bitwidth of this type.
+int getMemSize(Type *T);
+
 // Computed properties of an instruction commonly used by this pass's
 // handling functions.
 struct InstEnv {
@@ -31,7 +34,20 @@ struct InstEnv {
 struct InstOperandParams {
   public:
     InstOperandParams()
-        : param_num(-1), datatype(Type::VoidTyID), datasize(0), is_reg(true) {}
+        : param_num(-1), datatype(Type::VoidTyID), datasize(0), is_reg(true),
+          value(nullptr), operand_name(nullptr), bbid(nullptr),
+          prev_bbid(s_phi) {}
+
+    InstOperandParams(const InstOperandParams &other)
+        : param_num(other.param_num), datatype(other.datatype),
+          datasize(other.datasize), is_reg(other.is_reg), value(other.value),
+          operand_name(other.operand_name), bbid(other.bbid),
+          prev_bbid(other.prev_bbid) {}
+
+    void setDataTypeAndSize(Value* value) {
+        datatype = value->getType()->getTypeID();
+        datasize = getMemSize(value->getType());
+    }
 
     // Operand index (first, second, etc).
     int param_num;
@@ -44,7 +60,7 @@ struct InstOperandParams {
     // Value of this operand, if it has one. PHI nodes generally do not have values.
     Value* value;
 
-    char *reg_id;
+    char *operand_name;
     char *bbid;
     char *prev_bbid;
 };
@@ -105,9 +121,6 @@ class Tracer : public BasicBlockPass {
     bool is_tracking_function(std::string& func);
     // Is this function one of the special DMA functions?
     bool is_dma_function(std::string& funcName);
-
-    // Get the bitwidth of this type.
-    int getMemSize(Type *T);
 
     // Construct an ID for the given instruction.
     //

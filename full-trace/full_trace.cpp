@@ -271,7 +271,7 @@ bool Tracer::is_tracking_function(std::string& func) {
   return false;
 }
 
-int Tracer::getMemSize(Type *T) {
+int getMemSize(Type *T) {
   int size = 0;
   if (T->isPointerTy())
     return 8 * 8;
@@ -328,7 +328,7 @@ int Tracer::getMemSize(Type *T) {
 }
 
 void Tracer::printParamLine(Instruction *I, InstOperandParams *params) {
-  printParamLine(I, params->param_num, params->reg_id, params->bbid,
+  printParamLine(I, params->param_num, params->operand_name, params->bbid,
                  params->datatype, params->datasize, params->value,
                  params->is_reg, params->prev_bbid);
 }
@@ -458,7 +458,7 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
   for (BasicBlock::iterator itr = BB->begin(); isa<PHINode>(itr); itr++) {
     InstOperandParams params;
     params.prev_bbid = prev_bbid;
-    params.reg_id = operR;
+    params.operand_name = operR;
     params.bbid = s_phi;
 
     Value *curr_operand = nullptr;
@@ -478,24 +478,22 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
         getBBId(prev_bblock, params.prev_bbid);
         curr_operand = itr->getOperand(i);
         params.param_num = i + 1;
-        params.datatype = curr_operand->getType()->getTypeID();
-        params.datasize = getMemSize(curr_operand->getType());
+        params.setDataTypeAndSize(curr_operand);
 
         if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
           int flag = 0;
           params.value = nullptr;
-          params.is_reg = getInstId(I, nullptr, params.reg_id, &flag);
+          params.is_reg = getInstId(I, nullptr, params.operand_name, &flag);
           assert(flag == 0);
           if (curr_operand->getType()->isVectorTy()) {
             // Nothing else to do.
           } else {
-            // Use the instruction's datatype/datasize instead.
-            params.datatype = I->getType()->getTypeID();
-            params.datasize = getMemSize(I->getType());
+            // TODO: When is this different from curr_operand (as used above?)
+            params.setDataTypeAndSize(I);
           }
         } else {
           params.is_reg = curr_operand->hasName();
-          strcpy(params.reg_id, curr_operand->getName().str().c_str());
+          strcpy(params.operand_name, curr_operand->getName().str().c_str());
           if (curr_operand->getType()->isVectorTy()) {
             // Nothing else to do.
           } else {
@@ -510,7 +508,7 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
     if (!itr->getType()->isVoidTy()) {
       params.is_reg = true;
       params.param_num = RESULT_LINE;
-      params.reg_id = env->instid;
+      params.operand_name = env->instid;
       params.bbid = nullptr;
       params.datatype = itr->getType()->getTypeID();
       params.datasize = getMemSize(itr->getType());
@@ -527,11 +525,12 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
 }
 
 void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
-  char operR[256];
+  char caller_op_name[256];
+  char callee_op_name[256];
 
   CallInst *CI = dyn_cast<CallInst>(inst);
   Function *fun = CI->getCalledFunction();
-  strcpy(operR, (char *)fun->getName().str().c_str());
+  strcpy(caller_op_name, (char *)fun->getName().str().c_str());
   unsigned opcode;
   if (fun->getName().str().find("dmaLoad") != std::string::npos)
     opcode = DMA_LOAD;
@@ -548,86 +547,92 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
 
   printFirstLine(inst, env, opcode);
 
-  int num_of_operands = inst->getNumOperands();
-  Value* curr_operand = inst->getOperand(num_of_operands - 1);
-  bool is_reg = curr_operand->hasName();
-  assert(is_reg);
-  printParamLine(inst, num_of_operands, operR, nullptr,
-                 curr_operand->getType()->getTypeID(),
-                 getMemSize(curr_operand->getType()), curr_operand, is_reg);
+  // Print the line that names the function being called.
+  int num_operands = inst->getNumOperands();
+  Value* func_name_op = inst->getOperand(num_operands - 1);
+  InstOperandParams params;
+  params.param_num = num_operands;
+  params.operand_name = caller_op_name;
+  params.bbid = nullptr;
+  params.datatype = func_name_op->getType()->getTypeID();
+  params.datasize = getMemSize(func_name_op->getType());
+  params.value = func_name_op;
+  params.is_reg = func_name_op->hasName();
+  assert(params.is_reg);
+  printParamLine(inst, &params);
 
-  const Function::ArgumentListType &Args(fun->getArgumentList());
   int call_id = 0;
+  const Function::ArgumentListType &Args(fun->getArgumentList());
   for (Function::ArgumentListType::const_iterator arg_it = Args.begin(),
                                                   arg_end = Args.end();
-       arg_it != arg_end; ++arg_it) {
-    char curr_arg_name[256];
-    strcpy(curr_arg_name, (char *)arg_it->getName().str().c_str());
+       arg_it != arg_end; ++arg_it, ++call_id) {
+    Value* curr_operand = inst->getOperand(call_id);
 
-    curr_operand = inst->getOperand(call_id);
-    is_reg = curr_operand->hasName();
+    // Every argument in the function call will have two lines printed,
+    // reflecting the state of the operand in the caller AND callee function.
+    InstOperandParams caller;
+    InstOperandParams callee;
+
+    caller.param_num = call_id + 1;
+    caller.operand_name = caller_op_name;
+    caller.bbid = nullptr;
+
+    callee.param_num = FORWARD_LINE;
+    callee.operand_name = callee_op_name;
+    callee.is_reg = true;
+    callee.bbid = nullptr;
+
+    caller.setDataTypeAndSize(curr_operand);
+    callee.setDataTypeAndSize(curr_operand);
+    strcpy(caller.operand_name, curr_operand->getName().str().c_str());
+    strcpy(callee.operand_name, arg_it->getName().str().c_str());
+
     if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
+      // This operand was produced by an instruction in this basic block (and
+      // that instruction could be a phi node).
+
+      // TODO: Using an indirect way to ensure this instruction either has a
+      // name or a local slot is ugly.
       int flag = 0;
-      is_reg = getInstId(I, nullptr, operR, &flag);
+      caller.is_reg = getInstId(I, caller.bbid, caller.operand_name, &flag);
       assert(flag == 0);
+
       if (curr_operand->getType()->isVectorTy()) {
-        printParamLine(inst, call_id + 1, operR, nullptr,
-                       curr_operand->getType()->getTypeID(),
-                       getMemSize(curr_operand->getType()), nullptr, is_reg);
-        printParamLine(inst, FORWARD_LINE, curr_arg_name, nullptr,
-                       curr_operand->getType()->getTypeID(),
-                       getMemSize(curr_operand->getType()), nullptr, true);
+        // Nothing else to do. We don't want to print the value of a vector type.
       } else {
-        printParamLine(inst, call_id + 1, operR, nullptr,
-                       I->getType()->getTypeID(), getMemSize(I->getType()),
-                       curr_operand, is_reg);
-        printParamLine(inst, FORWARD_LINE, curr_arg_name, nullptr,
-                       I->getType()->getTypeID(), getMemSize(I->getType()),
-                       curr_operand, true);
+        // This is a non-vector operand, so print the value.
+        // TODO: The datatype and size of I should be the same as curr_operand,
+        // since I is just a cast from curr_operand. Keep the existing code for
+        // now, but look for an opportunity to test this on a vector type.
+        caller.setDataTypeAndSize(I);
+        callee.setDataTypeAndSize(I);
+        caller.value = curr_operand;
+        callee.value = curr_operand;
       }
+      printParamLine(inst, &caller);
+      printParamLine(inst, &callee);
     } else {
+      // This operand was not produced by this basic block. It may be a
+      // constant, a local variable produced by a different basic block, a
+      // global, a function argument, a code label, or something else.
+      caller.is_reg = curr_operand->hasName();
       if (curr_operand->getType()->isVectorTy()) {
-        char operand_id[256];
-        strcpy(operand_id, curr_operand->getName().str().c_str());
-        printParamLine(inst, call_id + 1, operand_id, nullptr,
-                       curr_operand->getType()->getTypeID(),
-                       getMemSize(curr_operand->getType()), nullptr, is_reg);
-        printParamLine(inst, FORWARD_LINE, curr_arg_name, nullptr,
-                       curr_operand->getType()->getTypeID(),
-                       getMemSize(curr_operand->getType()), nullptr, true);
+        // Nothing to do - again, don't print the value.
       } else if (curr_operand->getType()->isLabelTy()) {
-        char label_id[256];
-        getBBId(curr_operand, label_id);
-        printParamLine(inst, call_id + 1, label_id, nullptr,
-                       curr_operand->getType()->getTypeID(),
-                       getMemSize(curr_operand->getType()), nullptr, true);
-        printParamLine(inst, FORWARD_LINE, curr_arg_name, nullptr,
-                       curr_operand->getType()->getTypeID(),
-                       getMemSize(curr_operand->getType()), nullptr, true);
-      }
-      // is function
-      else if (curr_operand->getValueID() == 2) {
-        char func_id[256];
-        strcpy(func_id, curr_operand->getName().str().c_str());
-        printParamLine(inst, call_id + 1, func_id, nullptr,
-                       curr_operand->getType()->getTypeID(),
-                       getMemSize(curr_operand->getType()), nullptr, is_reg);
-        printParamLine(inst, FORWARD_LINE, curr_arg_name, nullptr,
-                       curr_operand->getType()->getTypeID(),
-                       getMemSize(curr_operand->getType()), nullptr, true);
+        // The operand name should be the code label itself. It has no value.
+        getBBId(curr_operand, caller.operand_name);
+        caller.is_reg = true;
+      } else if (curr_operand->getValueID() == Value::FunctionVal) {
+        // TODO: Replace this with an isa<> check instead.
+        // Nothing to do.
       } else {
-        char operand_id[256];
-        strcpy(operand_id, curr_operand->getName().str().c_str());
-        printParamLine(inst, call_id + 1, operand_id, nullptr,
-                       curr_operand->getType()->getTypeID(),
-                       getMemSize(curr_operand->getType()), curr_operand,
-                       is_reg);
-        printParamLine(inst, FORWARD_LINE, curr_arg_name, nullptr,
-                       curr_operand->getType()->getTypeID(),
-                       getMemSize(curr_operand->getType()), curr_operand, true);
+        // This operand does have a value to print.
+        caller.value = curr_operand;
+        callee.value = curr_operand;
       }
+      printParamLine(inst, &caller);
+      printParamLine(inst, &callee);
     }
-    call_id++;
   }
 }
 
