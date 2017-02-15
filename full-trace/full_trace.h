@@ -130,9 +130,9 @@ class Tracer : public BasicBlockPass {
     //
     // If the instruction does not produce a value, an artificial ID is
     // constructed by concatenating the given bbid, which both must not be NULL
-    // and the current instc.
+    // and the current instc, and this function returns false.
     //
-    // The ID is returned as a string in instid.
+    // The ID is stored in instid.
     bool getInstId(Instruction *I, char *bbid, char *instid, int *instc);
 
     // Construct an ID using the given instruction and environment.
@@ -140,6 +140,17 @@ class Tracer : public BasicBlockPass {
 
     // Get and set the operand name for this instruction.
     bool setOperandNameAndReg(Instruction *I, InstOperandParams *params);
+
+    // Get the variable name for this locally allocated variable.
+    //
+    // An alloca instruction allocates a certain amount of memory on the stack.
+    // This instruction will name the register that stores the pointer
+    // with the original source name if it is not locally allocated on the
+    // stack. If it is a local variable, it may just store it to a temporary
+    // register and name it with a slot number. In this latter case, track down
+    // the original variable name using debug information and store it in the
+    // slotToVarName map.
+    void processAllocaInstruction(BasicBlock::iterator it);
 
     // Construct an ID for the given basic block.
     //
@@ -170,6 +181,16 @@ class Tracer : public BasicBlockPass {
     // True if WORKLOAD specifies a single function, in which case the tracer
     // will track all functions called by it (the top-level function).
     bool is_toplevel_mode;
+
+  private:
+    // Stores names of local variables allocated by alloca.
+    //
+    // For alloca instructions that allocate local memory, this maps the
+    // register name (aka slot number) to the name of the variable itself.
+    //
+    // Since slot numbers are reused across functions, this has to be cleared
+    // when we switch to a new function.
+    std::map<unsigned, std::string> slotToVarName;
 };
 
 /* Reads a labelmap file and inserts it into the dynamic trace.

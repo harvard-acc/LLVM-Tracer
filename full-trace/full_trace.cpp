@@ -193,6 +193,7 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
     st->purgeFunction();
     st->incorporateFunction(func);
     curr_function = func;
+    slotToVarName.clear();
   }
 
   if (!is_toplevel_mode && !is_tracking_function(funcName))
@@ -246,6 +247,10 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
 
     if (!itr->getType()->isVoidTy()) {
       handleInstructionResult(itr, nextitr, &env);
+    }
+
+    if (isa<AllocaInst>(itr)) {
+      processAllocaInstruction(itr);
     }
   }
   return false;
@@ -410,18 +415,21 @@ bool Tracer::setOperandNameAndReg(Instruction *I, InstOperandParams *params) {
 }
 
 bool Tracer::getInstId(Instruction *I, char *bbid, char *instid, int *instc) {
-  int id = st->getLocalSlot(I);
-  bool has_name = I->hasName();
   assert(instid != nullptr);
-  if (has_name) {
-    strcpy(instid, (char *)I->getName().str().c_str());
+  if (I->hasName()) {
+    strcpy(instid, I->getName().str().c_str());
     return true;
   }
-  if (!has_name && id >= 0) {
+  int id = st->getLocalSlot(I);
+  if (slotToVarName.find(id) != slotToVarName.end()) {
+    strcpy(instid, slotToVarName[id].c_str());
+    return true;
+  }
+  if (id >= 0) {
     sprintf(instid, "%d", id);
     return true;
   }
-  if (!has_name && id == -1) {
+  if (id == -1) {
     // This instruction does not produce a value in a new register.
     // Examples include branches, stores, calls, returns.
     // instid is constructed using the bbid and a monotonically increasing
@@ -432,6 +440,38 @@ bool Tracer::getInstId(Instruction *I, char *bbid, char *instid, int *instc) {
     return true;
   }
   return false;
+}
+
+void Tracer::processAllocaInstruction(BasicBlock::iterator it) {
+  AllocaInst *alloca = dyn_cast<AllocaInst>(it);
+  // If this instruction's output register is already named, then we don't need
+  // to do any more searching.
+  if (!alloca->hasName()) {
+    int alloca_id = st->getLocalSlot(alloca);
+    bool found_debug_declare = false;
+    // The debug declare call is not guaranteed to come right after the alloca.
+    while (!found_debug_declare && !it->isTerminator()) {
+      it++;
+      Instruction *I = it;
+      DbgDeclareInst *di = dyn_cast<DbgDeclareInst>(I);
+      if (di) {
+        Value *wrapping_arg = di->getAddress();
+        int id = st->getLocalSlot(wrapping_arg);
+        // Ensure we've found the RIGHT debug declare call by comparing the
+        // variable whose debug information is being declared with the variable
+        // we're looking for.
+        if (id != alloca_id)
+          continue;
+
+        MDNode *md = di->getVariable();
+        // The name of the variable is the third operand of the metadata node.
+        Value *name_operand = md->getOperand(2);
+        std::string name = name_operand->getName().str();
+        slotToVarName[id] = name;
+        found_debug_declare = true;
+      }
+    }
+  }
 }
 
 void Tracer::getBBId(Value *BB, char *bbid) {
