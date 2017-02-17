@@ -100,6 +100,62 @@ static Constant *createStringArg(const char *string, Module *curr_module) {
     return ConstantExpr::getGetElementPtr(gvar_array, indices);
 }
 
+int getMemSize(Type *T) {
+  int size = 0;
+  if (T->isPointerTy())
+    return 8 * 8;
+  else if (T->isFunctionTy())
+    size = 0;
+  else if (T->isLabelTy())
+    size = 0;
+  else if (T->isStructTy()) {
+    StructType *S = dyn_cast<StructType>(T);
+    for (unsigned i = 0; i != S->getNumElements(); i++) {
+      Type *t = S->getElementType(i);
+      size += getMemSize(t);
+    }
+  } else if (T->isFloatingPointTy()) {
+    switch (T->getTypeID()) {
+    case llvm::Type::HalfTyID: ///<  1: 16-bit floating point typ
+      size = 16;
+      break;
+    case llvm::Type::FloatTyID: ///<  2: 32-bit floating point type
+      size = 4 * 8;
+      break;
+    case llvm::Type::DoubleTyID: ///<  3: 64-bit floating point type
+      size = 8 * 8;
+      break;
+    case llvm::Type::X86_FP80TyID: ///<  4: 80-bit floating point type (X87)
+      size = 10 * 8;
+      break;
+    case llvm::Type::FP128TyID:
+      ///<  5: 128-bit floating point type (112-bit mantissa)
+      size = 16 * 8;
+      break;
+    case llvm::Type::PPC_FP128TyID:
+      ///<  6: 128-bit floating point type (two 64-bits, PowerPC)
+      size = 16 * 8;
+      break;
+    default:
+      fprintf(stderr, "!!Unknown floating point type size\n");
+      assert(false && "Unknown floating point type size");
+    }
+  } else if (T->isIntegerTy())
+    size = cast<IntegerType>(T)->getBitWidth();
+  else if (T->isVectorTy())
+    size = cast<VectorType>(T)->getBitWidth();
+  else if (T->isArrayTy()) {
+    ArrayType *A = dyn_cast<ArrayType>(T);
+    size = (int)A->getNumElements() *
+           A->getElementType()->getPrimitiveSizeInBits();
+  } else {
+    fprintf(stderr, "!!Unknown data type: %d\n", T->getTypeID());
+    assert(false && "Unknown data type");
+  }
+
+  return size;
+}
+
 Tracer::Tracer() : BasicBlockPass(ID) {}
 
 bool Tracer::doInitialization(Module &M) {
@@ -196,10 +252,10 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
     slotToVarName.clear();
   }
 
-  if (!is_toplevel_mode && !is_tracking_function(funcName))
+  if (!is_toplevel_mode && !isTrackedFunction(funcName))
     return false;
 
-  if (is_dma_function(funcName))
+  if (isDmaFunction(funcName))
     return false;
 
   std::cout << "Tracking function: " << funcName << std::endl;
@@ -233,7 +289,7 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
         continue;
       if (!is_toplevel_mode) {
         std::string callfunc = fun->getName().str();
-        traceCall = trace_or_not(callfunc);
+        traceCall = traceOrNot(callfunc);
         if (!traceCall)
           continue;
       }
@@ -257,8 +313,8 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
 }
 
 
-bool Tracer::trace_or_not(std::string& func) {
-  if (is_tracking_function(func))
+bool Tracer::traceOrNot(std::string& func) {
+  if (isTrackedFunction(func))
     return true;
   for (int i = 0; i < intrinsics.size(); i++) {
     if (func == intrinsics[i])
@@ -267,69 +323,13 @@ bool Tracer::trace_or_not(std::string& func) {
   return false;
 }
 
-bool Tracer::is_tracking_function(std::string& func) {
+bool Tracer::isTrackedFunction(std::string& func) {
   // perform search in log(n) time.
   std::set<std::string>::iterator it = this->tracked_functions.find(func);
   if (it != this->tracked_functions.end()) {
       return true;
   }
   return false;
-}
-
-int getMemSize(Type *T) {
-  int size = 0;
-  if (T->isPointerTy())
-    return 8 * 8;
-  else if (T->isFunctionTy())
-    size = 0;
-  else if (T->isLabelTy())
-    size = 0;
-  else if (T->isStructTy()) {
-    StructType *S = dyn_cast<StructType>(T);
-    for (unsigned i = 0; i != S->getNumElements(); i++) {
-      Type *t = S->getElementType(i);
-      size += getMemSize(t);
-    }
-  } else if (T->isFloatingPointTy()) {
-    switch (T->getTypeID()) {
-    case llvm::Type::HalfTyID: ///<  1: 16-bit floating point typ
-      size = 16;
-      break;
-    case llvm::Type::FloatTyID: ///<  2: 32-bit floating point type
-      size = 4 * 8;
-      break;
-    case llvm::Type::DoubleTyID: ///<  3: 64-bit floating point type
-      size = 8 * 8;
-      break;
-    case llvm::Type::X86_FP80TyID: ///<  4: 80-bit floating point type (X87)
-      size = 10 * 8;
-      break;
-    case llvm::Type::FP128TyID:
-      ///<  5: 128-bit floating point type (112-bit mantissa)
-      size = 16 * 8;
-      break;
-    case llvm::Type::PPC_FP128TyID:
-      ///<  6: 128-bit floating point type (two 64-bits, PowerPC)
-      size = 16 * 8;
-      break;
-    default:
-      fprintf(stderr, "!!Unknown floating point type size\n");
-      assert(false && "Unknown floating point type size");
-    }
-  } else if (T->isIntegerTy())
-    size = cast<IntegerType>(T)->getBitWidth();
-  else if (T->isVectorTy())
-    size = cast<VectorType>(T)->getBitWidth();
-  else if (T->isArrayTy()) {
-    ArrayType *A = dyn_cast<ArrayType>(T);
-    size = (int)A->getNumElements() *
-           A->getElementType()->getPrimitiveSizeInBits();
-  } else {
-    fprintf(stderr, "!!Unknown data type: %d\n", T->getTypeID());
-    assert(false && "Unknown data type");
-  }
-
-  return size;
 }
 
 void Tracer::printParamLine(Instruction *I, InstOperandParams *params) {
@@ -487,7 +487,7 @@ void Tracer::getBBId(Value *BB, char *bbid) {
          "This basic block does not have a name or a ID!\n");
 }
 
-bool Tracer::is_dma_function(std::string& funcName) {
+bool Tracer::isDmaFunction(std::string& funcName) {
   return (funcName == "dmaLoad" ||
           funcName == "dmaStore" ||
           funcName == "dmaFence");

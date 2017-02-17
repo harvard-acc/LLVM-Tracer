@@ -116,11 +116,11 @@ class Tracer : public BasicBlockPass {
     void printParamLine(Instruction *I, InstOperandParams *params);
 
     // Should we trace this function or not?
-    bool trace_or_not(std::string& func);
+    bool traceOrNot(std::string& func);
     // Does this function appear in our list of tracked functions?
-    bool is_tracking_function(std::string& func);
+    bool isTrackedFunction(std::string& func);
     // Is this function one of the special DMA functions?
-    bool is_dma_function(std::string& funcName);
+    bool isDmaFunction(std::string& funcName);
 
     // Construct an ID for the given instruction.
     //
