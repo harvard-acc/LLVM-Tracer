@@ -38,13 +38,18 @@ cl::opt<string> labelMapFilename("i",
                                  cl::init("labelmap"));
 
 cl::opt<bool>
+    verbose("verbose-tracer",
+            cl::desc("Print verbose debugging output for the tracer."),
+            cl::init(false), cl::ValueDisallowed);
+
+cl::opt<bool>
     traceAllCallees("trace-all-callees",
                     cl::desc("If specified, all functions called by functions "
                              "specified in the env variable WORKLOAD "
                              "will be traced, even if there are multiple "
                              "functions in WORKLOAD. This means that each "
                              "function can act as a \"top-level\" function."),
-                    cl::value_desc(""), cl::init(false), cl::ValueDisallowed);
+                    cl::init(false), cl::ValueDisallowed);
 
 namespace {
 
@@ -205,7 +210,7 @@ bool Tracer::doInitialization(Module &M) {
   // We will instrument in top level mode if there is only one workload
   // function or if explicitly told to do so.
   is_toplevel_mode = (user_workloads.size() == 1) || traceAllCallees;
-  if (is_toplevel_mode)
+  if (is_toplevel_mode && verbose)
     std::cout << "LLVM-Tracer is instrumenting this workload in top-level mode.\n";
 
   st = createSlotTracker(&M);
@@ -270,7 +275,9 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
   if (isDmaFunction(funcName))
     return false;
 
-  std::cout << "Tracking function: " << funcName << std::endl;
+  if (verbose)
+    std::cout << "Tracking function: " << funcName << std::endl;
+
   // We have to get the first insertion point before we insert any
   // instrumentation!
   BasicBlock::iterator insertp = BB.getFirstInsertionPt();
@@ -767,7 +774,9 @@ bool LabelMapHandler::runOnModule(Module &M) {
     if (!ret)
         return false;
 
-    errs() << "Contents of labelmap:\n" << labelmap_str << "\n";
+    if (verbose)
+      errs() << "Contents of labelmap:\n" << labelmap_str << "\n";
+
     IRBuilder<> builder(main->front().getFirstInsertionPt());
     Function* labelMapWriter = cast<Function>(M.getOrInsertFunction(
         "trace_logger_write_labelmap", builder.getVoidTy(),
