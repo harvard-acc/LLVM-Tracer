@@ -556,18 +556,13 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
         if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
           setOperandNameAndReg(I, &params);
           params.value = nullptr;
-          if (curr_operand->getType()->isVectorTy()) {
-            // Nothing else to do.
-          } else {
-            // TODO: When is this different from curr_operand (as used above?)
-            params.setDataTypeAndSize(I);
+          if (!curr_operand->getType()->isVectorTy()) {
+            params.setDataTypeAndSize(curr_operand);
           }
         } else {
           params.is_reg = curr_operand->hasName();
           strcpy(params.operand_name, curr_operand->getName().str().c_str());
-          if (curr_operand->getType()->isVectorTy()) {
-            // Nothing else to do.
-          } else {
+          if (!curr_operand->getType()->isVectorTy()) {
             params.value = curr_operand;
           }
         }
@@ -663,15 +658,10 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
       // that instruction could be a phi node).
       setOperandNameAndReg(I, &caller);
 
-      if (curr_operand->getType()->isVectorTy()) {
-        // Nothing else to do. We don't want to print the value of a vector type.
-      } else {
-        // This is a non-vector operand, so print the value.
-        // TODO: The datatype and size of I should be the same as curr_operand,
-        // since I is just a cast from curr_operand. Keep the existing code for
-        // now, but look for an opportunity to test this on a vector type.
-        caller.setDataTypeAndSize(I);
-        callee.setDataTypeAndSize(I);
+      if (!curr_operand->getType()->isVectorTy()) {
+        // We don't want to print the value of a vector type.
+        caller.setDataTypeAndSize(curr_operand);
+        callee.setDataTypeAndSize(curr_operand);
         caller.value = curr_operand;
         callee.value = curr_operand;
       }
@@ -719,9 +709,7 @@ void Tracer::handleNonPhiNonCallInstruction(Instruction *inst, InstEnv* env) {
 
       if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
         setOperandNameAndReg(I, &params);
-        if (curr_operand->getType()->isVectorTy()) {
-          // Nothing more to do.
-        } else {
+        if (!curr_operand->getType()->isVectorTy()) {
           params.value = curr_operand;
         }
       } else {
