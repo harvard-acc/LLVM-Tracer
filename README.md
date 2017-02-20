@@ -29,7 +29,7 @@ Build:
     `lib/` instead of `full-trace/` and `profile-func/`. The `BUILD_ON_SOURCE`
     option has been removed.
 
-  CMake is a configure tool which allows you to out-of-source build.
+  CMake is a configure tool which allows you to do out-of-source build.
   LLVM-Tracer requires CMake newer than 2.8.12. By default, CMake
   searches for LLVM 3.4.
 
@@ -118,12 +118,18 @@ Example program: triad
         export WORKLOAD=triad
         ```
 
-        If you have multiple functions you are interested in (which are not
-        called by the top-level function), separate with commas:
+        If you have multiple functions, separate them with commas.
 
         ```
         export WORKLOAD=md,md_kernel
         ```
+
+        LLVM-Tracer will trace them differently based on the `-trace-all-callees` flag, which can be specified
+        to the `opt` command (see step d).
+
+        * If this flag is specified, then any function called by any function in the WORKLOAD variable will be traced.
+          This is a simple way to trace multiple "top-level" functions at once.
+        * If this flag is not specified, then only functions in the WORKLOAD variable will be traced.
 
      b. Generate the source code labelmap.
 
@@ -144,9 +150,11 @@ Example program: triad
         code.
 
         ```
-        opt -S -load=${TRACER_HOME}/full-trace/full_trace.so -fulltrace -labelmapwriter triad.llvm -o triad-opt.llvm
+        opt -S -load=${TRACER_HOME}/full-trace/full_trace.so -fulltrace -labelmapwriter [-trace-all-callees] triad.llvm -o triad-opt.llvm
         llvm-link -o full.llvm triad-opt.llvm ${TRACER_HOME}/profile-func/trace_logger.llvm
         ```
+
+        The `-trace-all-callees` flag is optional and defaults to false.
 
      e. Generate machine code:
 
@@ -161,7 +169,7 @@ Example program: triad
        ./triad-instrumented
        ```
 
-    g. There is a script provided which performs all of these operations.
+     g. There is a script provided which performs all of these operations.
 
        ```
        python llvm_compile.py $TRACER_HOME/example/triad triad

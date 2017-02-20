@@ -33,9 +33,19 @@ using namespace llvm;
 using namespace std;
 
 cl::opt<string> labelMapFilename("i",
-                                 cl::desc("Specify labelmap filename"),
+                                 cl::desc("Name of the labelmap file."),
                                  cl::value_desc("filename"),
                                  cl::init("labelmap"));
+
+cl::opt<bool>
+    traceAllCallees("trace-all-callees",
+                    cl::desc("If specified, all functions called by functions "
+                             "specified in the env variable WORKLOAD "
+                             "will be traced, even if there are multiple "
+                             "functions in WORKLOAD. This means that each "
+                             "function can act as a \"top-level\" function."),
+                    cl::value_desc(""), cl::init(false), cl::ValueDisallowed);
+
 namespace {
 
   void split(const std::string &s, const char delim, std::set<std::string> &elems) {
@@ -191,8 +201,10 @@ bool Tracer::doInitialization(Module &M) {
   }
   std::set<std::string> user_workloads;
   split(func_string, ',', user_workloads);
-  // Set toplevel function tracking mode if only one function is specified.
-  is_toplevel_mode = (user_workloads.size() == 1);
+
+  // We will instrument in top level mode if there is only one workload
+  // function or if explicitly told to do so.
+  is_toplevel_mode = (user_workloads.size() == 1) || traceAllCallees;
   if (is_toplevel_mode)
     std::cout << "LLVM-Tracer is instrumenting this workload in top-level mode.\n";
 
@@ -316,7 +328,7 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
 bool Tracer::traceOrNot(std::string& func) {
   if (isTrackedFunction(func))
     return true;
-  for (int i = 0; i < intrinsics.size(); i++) {
+  for (size_t i = 0; i < intrinsics.size(); i++) {
     if (func == intrinsics[i])
       return true;
   }
