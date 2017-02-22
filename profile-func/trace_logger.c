@@ -9,6 +9,16 @@
 #define RESULT_LINE 19134
 #define FORWARD_LINE 24601
 #define RET_OP 1
+#define MAX_FUNC_NAME_LEN 512
+
+typedef enum _logging_status {
+  // Log the current instruction (and its parameters) and then stop.
+  LOG_AND_STOP,
+  // Log the current instruction and continue logging.
+  LOG_AND_CONTINUE,
+  // Do not log the current instruction.
+  DO_NOT_LOG,
+} logging_status;
 
 void trace_logger_init();
 void trace_logger_write_labelmap(char* labelmap_buf, size_t labelmap_size);
@@ -19,9 +29,9 @@ void trace_logger_fin();
 
 gzFile full_trace_file;
 bool initp = false;
-bool track_curr_inst = false;
-bool track_next_inst = false;
 int inst_count = 0;
+char* current_toplevel_function;
+logging_status current_logging_status;
 
 void trace_logger_write_labelmap(char* labelmap_buf, size_t labelmap_size) {
     if (!initp) {
@@ -43,11 +53,81 @@ void trace_logger_init() {
     exit(-1);
   }
 
+  current_toplevel_function = (char*) calloc(MAX_FUNC_NAME_LEN, 1);
+  current_logging_status = DO_NOT_LOG;
+
   atexit(&trace_logger_fin);
 }
 
 void trace_logger_fin() {
+  free(current_toplevel_function);
   gzclose(full_trace_file);
+}
+
+// Determine whether to log the current and next instructions.
+//
+// This can get a bit hairy, so here is the truth table.
+//
+// TLM = is_toplevel_mode
+// TLF = is_toplevel_function (aka, does this function exist in the WORKLOAD
+//       env variable?).
+// RET = is this opcode a return?
+//
+// ============================================
+//   TLM | TLF | RET | Behavior
+// --------------------------------------------
+//    0     0     0     DO_NOT_LOG
+// --------------------------------------------
+//    0     0     1     DO_NOT_LOG
+// --------------------------------------------
+//    0     1     0     LOG_AND_CONTINUE
+// --------------------------------------------
+//    0     1     1     LOG_AND_CONTINUE
+// --------------------------------------------
+//    1     0     0     Continue current status
+// --------------------------------------------
+//    1     0     1     Continue current status
+// --------------------------------------------
+//    1     1     0     LOG_AND_CONTINUE
+// --------------------------------------------
+//
+//                      if current_function == current_toplevel_function
+//    1     1     1         LOG_AND_STOP
+//                      else
+//                          BAD_BEHAVIOR
+//
+// ============================================
+//
+// The very last line (when all three variables are true) is to ensure that
+// we don't ever call a top-level function from within another top level
+// function (since this would defeat the purpose of having top level
+// functions).
+logging_status log_or_not(bool is_toplevel_mode, bool is_toplevel_function,
+                          int opcode, char *current_function) {
+  if (!is_toplevel_mode)
+    return is_toplevel_function ? LOG_AND_CONTINUE : DO_NOT_LOG;
+
+  if (!is_toplevel_function)
+    return current_logging_status;
+
+  if (opcode != RET_OP)
+    return LOG_AND_CONTINUE;
+
+  if (strlen(current_toplevel_function) == 0)
+    assert(false &&
+           "Returning from within a toplevel function before it was called!");
+
+  if (strcmp(current_function, current_toplevel_function) == 0)
+    return LOG_AND_STOP;
+
+  assert(false && "Cannot call a top level function from within another one!");
+
+  // Unreachable.
+  return LOG_AND_CONTINUE;
+}
+
+bool do_not_log() {
+  return current_logging_status == DO_NOT_LOG;
 }
 
 void trace_logger_log0(int line_number, char *name, char *bbid, char *instid,
@@ -57,39 +137,30 @@ void trace_logger_log0(int line_number, char *name, char *bbid, char *instid,
     initp = true;
   }
 
-  if (inst_count == 0 && is_tracked_function)
-    track_curr_inst = true;
-  else
-    track_curr_inst = track_next_inst;
-
-  /*
-   * If we are in top level mode:
-   *   1. Start tracking if the function is tracked and we're not currently.
-   *   tracking.  Otherwise, don't change what we're doing (for the rest of the
-   *   parameter lines).
-   *
-   *   2. Stop tracking if the function is tracked, the opcode is a RETURN,
-   *   and we're currently tracking. We'll finish the current op but we won't
-   *   track the next one.
-   *
-   *   3. Otherwise, do whatever we were currently doing (tracking or not).
-   *
-   * If we are NOT in top level mode, then track if the function is tracked
-   * (obviously).
-   */
-  if (is_toplevel_mode) {
-    if (is_tracked_function) {
-      if (opcode == RET_OP && track_curr_inst) {
-        track_next_inst = false;
-      } else {
-        track_next_inst = true;
-      }
-    }
-  } else {
-    track_next_inst = true;
+  // LOG_AND_STOP would have been set by the previous instruction (which should
+  // be logged), and this is already the next one, so STOP.
+  if (current_logging_status == LOG_AND_STOP) {
+    printf("Stopping logging at inst %d.\n", inst_count);
+    current_logging_status = DO_NOT_LOG;
+    return;
   }
 
-  if (!track_curr_inst)
+  logging_status temp = current_logging_status;
+
+  current_logging_status =
+      log_or_not(is_toplevel_mode, is_tracked_function, opcode, name);
+
+  if (temp == DO_NOT_LOG && current_logging_status != temp)
+    printf("Starting to log at inst = %d.\n", inst_count);
+
+  if (strlen(current_toplevel_function) == 0 &&
+      current_logging_status == LOG_AND_CONTINUE) {
+    strcpy(current_toplevel_function, name);
+  } else if (current_logging_status == LOG_AND_STOP) {
+    memset(current_toplevel_function, 0, MAX_FUNC_NAME_LEN);
+  }
+
+  if (current_logging_status == DO_NOT_LOG)
     return;
 
   gzprintf(full_trace_file, "\n0,%d,%s,%s,%s,%d,%d\n", line_number, name, bbid,
@@ -100,7 +171,7 @@ void trace_logger_log0(int line_number, char *name, char *bbid, char *instid,
 void trace_logger_log_int(int line, int size, int64_t value, int is_reg,
                           char *label, int is_phi, char *prev_bbid) {
   assert(initp == true);
-  if (!track_curr_inst)
+  if (do_not_log())
     return;
   if (line == RESULT_LINE)
     gzprintf(full_trace_file, "r,%d,%ld,%d", size, value, is_reg);
@@ -120,7 +191,7 @@ void trace_logger_log_int(int line, int size, int64_t value, int is_reg,
 void trace_logger_log_double(int line, int size, double value, int is_reg,
                              char *label, int is_phi, char *prev_bbid) {
   assert(initp == true);
-  if (!track_curr_inst)
+  if (do_not_log())
     return;
   if (line == RESULT_LINE)
     gzprintf(full_trace_file, "r,%d,%f,%d", size, value, is_reg);
