@@ -37,6 +37,12 @@ using namespace clang::driver;
 using namespace clang::tooling;
 using namespace llvm;
 
+// The option categories, to group options in the man page. It is useless
+// here, since we don't have any new options in this tool.
+// Declaring here because CommonOptionsParser requires this one in LLVM 3.5.
+// http://llvm.org/docs/CommandLine.html#grouping-options-into-categories
+cl::OptionCategory GetLabelStmtsCat("GetLabelStmts options");
+
 // Maps pairs of (func_name, label_name) to line numbers.
 static std::map<std::pair<std::string, std::string>, unsigned> labelMap;
 static const std::string outputFileName = "labelmap";
@@ -155,9 +161,21 @@ static void cleanup() {
 }
 
 int main(int argc, const char** argv) {
+#if (LLVM_VERSION == 34)
   CommonOptionsParser op(argc, argv);
+#elif (LLVM_VERSION == 35)
+  CommonOptionsParser op(argc, argv, GetLabelStmtsCat);
+#endif
+
   ClangTool Tool(op.getCompilations(), op.getSourcePathList());
   cleanup();
-  int result = Tool.run(newFrontendActionFactory<LabeledStmtFrontendAction>());
+
+  // In llvm 3.4, newFrontendActionFactory returns raw pointers.
+  // In llvm 3.5, it returns unique_ptr<>
+  // Use unique_ptr to keep pointers, therefore being compatible with
+  // LLVM 3.4/3.5
+  std::unique_ptr<FrontendActionFactory>
+        actionfactory(newFrontendActionFactory<LabeledStmtFrontendAction>());
+  int result = Tool.run(actionfactory.get());
   return result;
 }
