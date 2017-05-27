@@ -7,7 +7,6 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Type.h"
-#include "llvm/DebugInfo.h"
 #include "llvm/Support/CommandLine.h"
 #include <cstring>
 #include <cstdlib>
@@ -19,6 +18,12 @@
 #include <sys/stat.h>
 #include "SlotTracker.h"
 #include "full_trace.h"
+
+#if (LLVM_VERSION == 34)
+  #include "llvm/DebugInfo.h"
+#elif (LLVM_VERSION == 35)
+  #include "llvm/IR/DebugInfo.h"
+#endif
 
 #define RESULT_LINE 19134
 #define FORWARD_LINE 24601
