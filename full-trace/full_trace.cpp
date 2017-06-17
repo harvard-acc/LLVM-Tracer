@@ -480,6 +480,9 @@ void Tracer::processAllocaInstruction(BasicBlock::iterator it) {
       DbgDeclareInst *di = dyn_cast<DbgDeclareInst>(I);
       if (di) {
         Value *wrapping_arg = di->getAddress();
+        // Undefined values do not get a local slot.
+        if (isa<UndefValue>(wrapping_arg))
+          continue;
         int id = st->getLocalSlot(wrapping_arg);
         // Ensure we've found the RIGHT debug declare call by comparing the
         // variable whose debug information is being declared with the variable
