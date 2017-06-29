@@ -1,0 +1,64 @@
+#### NOTES ####
+# Define TRACER_HOME, WORKLOAD before including this.
+###############
+
+CURRENT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+COMMON_DIR := $(CURRENT_DIR)
+SRCS = $(wildcard *.c)
+EXEC = test
+
+.PHONY: trace-binary run-trace clean
+
+##################################
+#         TOP LEVEL RULES        #
+##################################
+
+trace-binary: $(EXEC)-instrumented
+
+run-trace: trace-binary
+	./$(EXEC)-instrumented
+
+##################################
+#      COMPILATION FLAGS         #
+##################################
+
+TRACER = $(TRACER_HOME)/lib/full_trace.so
+LOGGER = $(TRACER_HOME)/lib/trace_logger.llvm
+GET_LABELED_STMTS = $(TRACER_HOME)/bin/get-labeled-stmts
+
+ALL_SRCS = $(SRCS)
+CPPFLAGS = -I$(COMMON_DIR)
+
+LLVM_OBJS = $(patsubst %.c, %-opt.llvm, $(ALL_SRCS))
+
+#########################################################
+#        INSTRUMENTATION AND TRACE FILE GENERATION      #
+#########################################################
+
+labelmap: $(ALL_SRCS)
+	$(GET_LABELED_STMTS) $(ALL_SRCS) -- -I$(LLVM_HOME)/lib/clang/3.4/include $(CPPFLAGS) $(BMARK_SPECIFIC_CFLAGS)
+
+full.llvm: $(LLVM_OBJS)
+	llvm-link -o $@ $^ $(LOGGER)
+
+full.s: full.llvm
+	llc -O0 -disable-fp-elim -filetype=asm -o $@ $<
+
+$(EXEC)-instrumented: full.s
+	$(CXX) -static -O0 -fno-inline -o $@ $< -lm -lz
+
+%-opt.llvm: %.c labelmap
+	clang -static -g -O1 -S -fno-slp-vectorize -fno-vectorize -fno-unroll-loops \
+        -fno-inline -fno-builtin -emit-llvm \
+				$(CPPFLAGS) \
+        $(BMARK_SPECIFIC_CFLAGS) \
+        -o $*.llvm $<
+	opt -S -load=$(TRACER) -fulltrace -labelmapwriter $*.llvm -o $@
+
+clean:
+	rm -f *.llvm
+	rm -f *.o
+	rm -f dynamic_trace.gz
+	rm -f *-instrumented
+	rm -f full.s
+	rm -f labelmap
