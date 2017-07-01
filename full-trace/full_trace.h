@@ -65,7 +65,7 @@ struct InstOperandParams {
     char *prev_bbid;
 };
 
-class Tracer : public BasicBlockPass {
+class Tracer : public FunctionPass {
   public:
     Tracer();
     virtual ~Tracer() {}
@@ -80,6 +80,7 @@ class Tracer : public BasicBlockPass {
     };
 
     virtual bool doInitialization(Module &M);
+    virtual bool runOnFunction(Function& F);
     virtual bool runOnBasicBlock(BasicBlock &BB);
 
   private:

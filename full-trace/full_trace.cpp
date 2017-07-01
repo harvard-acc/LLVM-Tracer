@@ -176,7 +176,7 @@ int getMemSize(Type *T) {
   return size;
 }
 
-Tracer::Tracer() : BasicBlockPass(ID) {}
+Tracer::Tracer() : FunctionPass(ID) {}
 
 bool Tracer::doInitialization(Module &M) {
   std::string func_string;
@@ -258,6 +258,14 @@ bool Tracer::doInitialization(Module &M) {
     }
   }
 
+  return false;
+}
+
+bool Tracer::runOnFunction(Function &F) {
+  for (auto bb_it = F.begin(); bb_it != F.end(); ++bb_it) {
+    BasicBlock& bb = *bb_it;
+    runOnBasicBlock(bb);
+  }
   return false;
 }
 
