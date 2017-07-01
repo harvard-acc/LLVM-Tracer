@@ -82,6 +82,7 @@ class Tracer : public FunctionPass {
     virtual bool doInitialization(Module &M);
     virtual bool runOnFunction(Function& F);
     virtual bool runOnBasicBlock(BasicBlock &BB);
+    virtual void getAnalysisUsage(AnalysisUsage& Info) const;
 
   private:
     // Instrumentation functions for different types of nodes.
@@ -153,14 +154,14 @@ class Tracer : public FunctionPass {
     // slotToVarName map.
     void processAllocaInstruction(BasicBlock::iterator it);
 
-    // Construct an ID for the given basic block.
+    // Construct a string ID for the given Value object.
     //
-    // This ID is either the name of the basic block (e.g. ".lr.ph",
-    // "_crit_edge") or the local slot number (which would appear in the IR as
-    // "; <label>:N".
+    // This ID is either the name of the object or the local slot number.
+    // If the object is a BasicBlock, then we append the current loop depth D
+    // of this basic block to the end of the ID like name:D.
     //
-    // The ID is stored as a string in bbid.
-    void getBBId(Value *BB, char *bbid);
+    // The ID is stored as a string in id_str.
+    void makeValueId(Value *value, char *id_str);
 
     // References to the logging functions.
     Value *TL_log0;

@@ -1,6 +1,7 @@
 #include <vector>
 #include <map>
 #include <cmath>
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
@@ -306,7 +307,7 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
     nextitr++;
 
     // Get static BasicBlock ID: produce bbid
-    getBBId(&BB, env.bbid);
+    makeValueId(&BB, env.bbid);
     // Get static instruction ID: produce instid
     getInstId(itr, &env);
     setLineNumberIfExists(itr, &env);
@@ -509,17 +510,29 @@ void Tracer::processAllocaInstruction(BasicBlock::iterator it) {
   }
 }
 
-void Tracer::getBBId(Value *BB, char *bbid) {
-  int id;
-  id = st->getLocalSlot(BB);
-  bool hasName = BB->hasName();
+void Tracer::makeValueId(Value *value, char *id_str) {
+  int id = st->getLocalSlot(value);
+  bool hasName = value->hasName();
+  if (BasicBlock* BB = dyn_cast<BasicBlock>(value)) {
+    LoopInfo &info = getAnalysis<LoopInfo>();
+    unsigned loop_depth = info.getLoopDepth(BB);
+    // 10^3 - 1 is the maximum loop depth.
+    const unsigned kMaxLoopDepthChars = 3;
+    if (hasName) {
+      const std::string& bb_name = value->getName().str();
+      snprintf(id_str, bb_name.size() + 1 + kMaxLoopDepthChars, "%s:%u",
+               bb_name.c_str(), loop_depth);
+    } else {
+      snprintf(id_str, 2 * kMaxLoopDepthChars + 1, "%d:%u", id, loop_depth);
+    }
+    return;
+  }
   if (hasName)
-    strcpy(bbid, (char *)BB->getName().str().c_str());
+    strcpy(id_str, (char *)value->getName().str().c_str());
   if (!hasName && id >= 0)
-    sprintf(bbid, "%d", id);
-  // Something went wrong.
+    sprintf(id_str, "%d", id);
   assert((hasName || id != -1) &&
-         "This basic block does not have a name or a ID!\n");
+         "This value does not have a name or a slot number!\n");
 }
 
 bool Tracer::isDmaFunction(std::string& funcName) {
@@ -552,7 +565,7 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
 
     Value *curr_operand = nullptr;
 
-    getBBId(BB, env->bbid);
+    makeValueId(BB, env->bbid);
     getInstId(itr, env);
     setLineNumberIfExists(itr, env);
 
@@ -564,7 +577,7 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
       for (int i = num_of_operands - 1; i >= 0; i--) {
         BasicBlock *prev_bblock =
             (dyn_cast<PHINode>(itr))->getIncomingBlock(i);
-        getBBId(prev_bblock, params.prev_bbid);
+        makeValueId(prev_bblock, params.prev_bbid);
         curr_operand = itr->getOperand(i);
         params.param_num = i + 1;
         params.setDataTypeAndSize(curr_operand);
@@ -692,7 +705,7 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
         // Nothing to do - again, don't print the value.
       } else if (curr_operand->getType()->isLabelTy()) {
         // The operand name should be the code label itself. It has no value.
-        getBBId(curr_operand, caller.operand_name);
+        makeValueId(curr_operand, caller.operand_name);
         caller.is_reg = true;
       } else if (curr_operand->getValueID() == Value::FunctionVal) {
         // TODO: Replace this with an isa<> check instead.
@@ -732,7 +745,7 @@ void Tracer::handleNonPhiNonCallInstruction(Instruction *inst, InstEnv* env) {
         if (curr_operand->getType()->isVectorTy()) {
           // Nothing more to do.
         } else if (curr_operand->getType()->isLabelTy()) {
-          getBBId(curr_operand, params.operand_name);
+          makeValueId(curr_operand, params.operand_name);
           params.is_reg = true;
         } else if (curr_operand->getValueID() == Value::FunctionVal) {
           // TODO: Replace this with an isa<> check instead.
@@ -777,6 +790,11 @@ void Tracer::handleInstructionResult(Instruction *inst, Instruction *next_inst,
     params.value = inst;
   }
   printParamLine(next_inst, &params);
+}
+
+void Tracer::getAnalysisUsage(AnalysisUsage& Info) const {
+  Info.addRequired<LoopInfo>();
+  Info.setPreservesAll();
 }
 
 LabelMapHandler::LabelMapHandler() : ModulePass(ID) {}
