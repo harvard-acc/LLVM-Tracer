@@ -4,6 +4,7 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Metadata.h"
@@ -275,6 +276,10 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
   std::string funcName = func->getName().str();
   InstEnv env;
   strncpy(env.funcName, funcName.c_str(), InstEnv::BUF_SIZE);
+  // Functions suffixed with "_fxp" will have all relevant FP ops printed in the
+  // trace as fixed-point ops instead.
+  if (funcName.rfind("_fxp", funcName.size() - 4) != std::string::npos)
+    env.to_fxpt = true;
 
   if (curr_function != func) {
     st->purgeFunction();
@@ -416,6 +421,8 @@ void Tracer::printFirstLine(Instruction *I, InstEnv *env, unsigned opcode) {
   IRBuilder<> IRB(I);
   Value *v_opty, *v_linenumber, *v_is_tracked_function,
       *v_is_toplevel_mode;
+  if (env->to_fxpt)
+    opcode = opcodeToFixedPoint(opcode);
   v_opty = ConstantInt::get(IRB.getInt64Ty(), opcode);
   v_linenumber = ConstantInt::get(IRB.getInt64Ty(), env->line_number);
 
@@ -433,6 +440,29 @@ void Tracer::printFirstLine(Instruction *I, InstEnv *env, unsigned opcode) {
                     vv_inst,           v_opty,       v_is_tracked_function,
                     v_is_toplevel_mode };
   IRB.CreateCall(TL_log0, args);
+}
+
+unsigned Tracer::opcodeToFixedPoint(unsigned opcode) {
+  switch (opcode) {
+    case Instruction::FAdd:
+      return Instruction::Add;
+    case Instruction::FSub:
+      return Instruction::Sub;
+    case Instruction::FMul:
+      return Instruction::Mul;
+    case Instruction::FDiv:
+      return Instruction::SDiv;
+    case Instruction::FRem:
+      return Instruction::SRem;
+    case Instruction::FPTrunc:
+      return Instruction::Trunc;
+    case Instruction::FPExt:
+      return Instruction::SExt;
+    case Instruction::FCmp:
+      return Instruction::ICmp;
+    default:
+      return opcode;
+  }
 }
 
 bool Tracer::getInstId(Instruction *I, InstEnv* env) {

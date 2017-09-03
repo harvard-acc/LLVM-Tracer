@@ -15,7 +15,7 @@ int getMemSize(Type *T);
 // handling functions.
 struct InstEnv {
   public:
-    InstEnv() : line_number(-1), instc(0) {}
+    InstEnv() : line_number(-1), instc(0), to_fxpt(false) {}
 
     enum { BUF_SIZE = 256 };
 
@@ -29,6 +29,8 @@ struct InstEnv {
     int line_number;
     // Static instruction count within this basic block.
     int instc;
+    // Convert all fp operations to fxpt.
+    bool to_fxpt;
 };
 
 struct InstOperandParams {
@@ -162,6 +164,13 @@ class Tracer : public FunctionPass {
     //
     // The ID is stored as a string in id_str.
     void makeValueId(Value *value, char *id_str);
+
+    // Convert a floating point opcode to its corresponding integer opcode.
+    //
+    // When more than one integer opcode is possible, prefer the signed
+    // version. If a conversion is not applicable (e.g. branch, and, ret,
+    // etc.), return the input opcode.
+    unsigned opcodeToFixedPoint(unsigned opcode);
 
     // References to the logging functions.
     Value *TL_log0;
