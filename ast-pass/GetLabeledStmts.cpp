@@ -24,7 +24,9 @@
 #include "clang/AST/AST.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTConsumer.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/RecursiveASTVisitor.h"
+#include "clang/Basic/AttrKinds.h"
 #include "clang/Driver/Options.h"
 #include "clang/Frontend/ASTConsumers.h"
 #include "clang/Frontend/FrontendActions.h"
@@ -43,8 +45,50 @@ using namespace llvm;
 // http://llvm.org/docs/CommandLine.html#grouping-options-into-categories
 cl::OptionCategory GetLabelStmtsCat("GetLabelStmts options");
 
+// A class containing all the labels and caller information for a function.
+class FunctionInfo {
+ public:
+  typedef std::map<std::string, unsigned> labelmap_t;
+  typedef std::set<std::string> caller_set_t;
+  FunctionInfo() : inlined(false) {}
+
+  unsigned& operator[](const std::string& label) {
+    if (labelToLineNum.find(label) == labelToLineNum.end())
+      labelToLineNum[label] = 0;
+    return labelToLineNum[label];
+  }
+
+  labelmap_t::const_iterator label_begin() const {
+    return labelToLineNum.cbegin();
+  }
+
+  labelmap_t::const_iterator label_end() const {
+    return labelToLineNum.cend();
+  }
+
+  caller_set_t::const_iterator caller_begin() const {
+    return callers.cbegin();
+  }
+
+  caller_set_t::const_iterator caller_end() const {
+    return callers.cend();
+  }
+
+  void add_caller(std::string function) {
+    callers.insert(function);
+  }
+
+  bool is_inlined() const { return inlined; }
+  void set_inlined(bool _inlined) { inlined = _inlined; }
+
+ private:
+  labelmap_t labelToLineNum;
+  caller_set_t callers;
+  bool inlined;
+};
+
 // Maps pairs of (func_name, label_name) to line numbers.
-static std::map<std::pair<std::string, std::string>, unsigned> labelMap;
+static std::map<std::string, FunctionInfo> labelMap;
 static const std::string outputFileName = "labelmap";
 
 class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
@@ -64,9 +108,8 @@ class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
     SourceLocation loc = subStmt->getLocStart();
     unsigned line = srcManager->getExpansionLineNumber(loc);
     std::string labelName(labelStmt->getName());
-    std::string funcName = func->getName().str();
-    auto key = std::make_pair(funcName, labelName);
-    labelMap.insert(std::make_pair(key, line));
+    const std::string& funcName = func->getName().str();
+    labelMap[funcName][labelName] = line;
   }
 
   // Handle a labeled statement, if it is one.
@@ -89,6 +132,24 @@ class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
     }
   }
 
+  // Handle a call expression, if it is one.
+  //
+  // If the statement is a Call expression, add the calling function to the set
+  // of caller functions in the callee function's FunctionInfo object. This
+  // will be used at the end to resolve the true location of inlined functions.
+  void handleIfCallExpr(Stmt* st, const FunctionDecl* caller_func) const {
+    if (!caller_func || !st || caller_func->isMain())
+      return;
+    CallExpr* callExpr = dyn_cast<CallExpr>(st);
+    if (callExpr) {
+      const FunctionDecl* callee = callExpr->getDirectCallee();
+      if (callee) {
+        labelMap[callee->getName().str()].add_caller(
+            caller_func->getName().str());
+      }
+    }
+  }
+
   void VisitAllChildStmtsOf(Stmt* stmt, const FunctionDecl* func) const {
     if (!stmt)
       return;
@@ -98,6 +159,7 @@ class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
       Stmt* childStmt = *it;
       stack.push(childStmt);
       handleIfLabelStmt(childStmt, func);
+      handleIfCallExpr(childStmt, func);
     }
     while (!stack.empty()) {
       Stmt* next = stack.top();
@@ -109,6 +171,14 @@ class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
   // For each function, recursively find every child label statement.
   virtual bool VisitFunctionDecl(const FunctionDecl* func) const {
     if (func->hasBody()) {
+      const std::string& funcName = func->getName().str();
+      if (labelMap.find(funcName) == labelMap.end())
+        labelMap[funcName] = FunctionInfo();
+
+      for (auto it = func->attr_begin(); it != func->attr_end(); ++it) {
+        if ((*it)->getKind() == clang::attr::AlwaysInline)
+          labelMap[funcName].set_inlined(true);
+      }
       Stmt* body = func->getBody(func);
       VisitAllChildStmtsOf(body, func);
     }
@@ -135,6 +205,55 @@ class LabeledStmtFrontendAction : public ASTFrontendAction {
     return new LabeledStmtASTConsumer(&CI);
   }
 
+  // Write a label to line number mapping to the labelmap file.
+  //
+  // Example output:
+  //    function/label 20
+  void writeLabelMapLine(std::ofstream &ofs, const std::string &function,
+                         const std::string &label, unsigned line_number) {
+    ofs << function << "/" << label << " " << line_number << "\n";
+  }
+
+  // Write an inlined label to line number mapping.
+  //
+  // Example output:
+  //    inlined_function/label 20 inline caller_1 caller_2...
+  //
+  // where inlined_function is the name of the original function that
+  // contains the label, and caller_1, caller_2, etc. are all the NON-INLINED
+  // functions in which inlined_function is cloned into.
+  void writeLabelMapLineWithInline(std::ofstream &ofs,
+                                   const std::string &function,
+                                   const std::string &label,
+                                   unsigned line_number,
+                                   std::list<std::string> callers) {
+    ofs << function << "/" << label << " " << line_number;
+    if (callers.size() == 0)
+      return;
+    ofs << " inline";
+    for (auto caller : callers)
+      ofs << " " << caller;
+    ofs << "\n";
+  }
+
+  // Return a list of all non-inlined functions that call leaf_function.
+  void findAllNoninlinedCallers(const std::string &leaf_function,
+                                std::list<std::string> &callers) {
+    const FunctionInfo& leaf = labelMap[leaf_function];
+    for (auto it = leaf.caller_begin(); it != leaf.caller_end(); ++it) {
+      const std::string& caller_name = *it;
+      const FunctionInfo& caller_info = labelMap[caller_name];
+      // If the caller function is not inlined, then it is the last function
+      // along this call stack that could potentially contain this label.
+      // Therefore, we end the recursive search here. Otherwise, we keep
+      // searching recursively.
+      if (!caller_info.is_inlined())
+        callers.push_back(caller_name);
+      else
+        findAllNoninlinedCallers(caller_name, callers);
+    }
+  }
+
   // Dump the contents of labelMap to the output file.
   //
   // Since this is called per source file, labelMap must be cleared afterwards
@@ -142,10 +261,24 @@ class LabeledStmtFrontendAction : public ASTFrontendAction {
   virtual void EndSourceFileAction() {
     std::ofstream ofs;
     ofs.open(outputFileName, std::ofstream::out | std::ofstream::app);
-    for (auto it = labelMap.begin(); it != labelMap.end(); ++it) {
-      auto pair = it->first;
-      unsigned line = it->second;
-      ofs << pair.first << "/" << pair.second << " " << line << "\n";
+    for (auto func_it = labelMap.begin(); func_it != labelMap.end(); ++func_it) {
+      const std::string& funcName = func_it->first;
+      const FunctionInfo& funcInfo = func_it->second;
+
+      if (funcInfo.is_inlined()) {
+        std::list<std::string> callers;
+        findAllNoninlinedCallers(funcName, callers);
+        for (auto label_it = funcInfo.label_begin();
+             label_it != funcInfo.label_end(); ++label_it) {
+          writeLabelMapLineWithInline(ofs, funcName, label_it->first,
+                                      label_it->second, callers);
+        }
+      } else {
+        for (auto label_it = funcInfo.label_begin();
+             label_it != funcInfo.label_end(); ++label_it) {
+          writeLabelMapLine(ofs, funcName, label_it->first, label_it->second);
+        }
+      }
     }
     ofs.close();
     labelMap.clear();
