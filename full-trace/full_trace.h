@@ -176,6 +176,7 @@ class Tracer : public FunctionPass {
     Value *TL_log0;
     Value *TL_log_int;
     Value *TL_log_double;
+    Value *TL_log_vector;
 
     // The current module.
     Module *curr_module;

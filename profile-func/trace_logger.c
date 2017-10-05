@@ -208,3 +208,39 @@ void trace_logger_log_double(int line, int size, double value, int is_reg,
   else
     gzprintf(full_trace_file, ",\n");
 }
+
+// Convert @size bytes in the buffer @value to a hex string, stored in @buf.
+//
+// The output string is prefixed by 0x and is null terminated. The output does
+// NOT account for endianness!
+void convert_bytes_to_hex(char* buf, uint8_t* value, int size) {
+  sprintf(buf, "0x");
+  buf += 2;
+  for (int i = 0; i < size; i++) {
+    buf += sprintf(buf, "%02x", value[i]);
+  }
+  *buf = 0;
+}
+
+void trace_logger_log_vector(int line, int size, uint8_t* value, int is_reg,
+                             char *label, int is_phi, char *prev_bbid) {
+  assert(initp == true);
+  if (do_not_log())
+    return;
+  char value_str[size/4+3];  // +3 for "0x" and null termination.
+  convert_bytes_to_hex(&value_str[0], value, size/8);
+  if (line == RESULT_LINE)
+    gzprintf(full_trace_file, "r,%d,%s,%d", size, value_str, is_reg);
+  else if (line == FORWARD_LINE)
+    gzprintf(full_trace_file, "f,%d,%s,%d", size, value_str, is_reg);
+  else
+    gzprintf(full_trace_file, "%d,%d,%s,%d", line, size, value_str, is_reg);
+  if (is_reg)
+    gzprintf(full_trace_file, ",%s", label);
+  else
+    gzprintf(full_trace_file, ", ");
+  if (is_phi)
+    gzprintf(full_trace_file, ",%s,\n", prev_bbid);
+  else
+    gzprintf(full_trace_file, ",\n");
+}

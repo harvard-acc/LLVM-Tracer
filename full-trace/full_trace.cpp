@@ -106,6 +106,22 @@ std::vector<std::string> intrinsics = {
 
 }// end of anonymous namespace
 
+// The vector data is not guaranteed to have a memory address (it could be just
+// a register). In order to print the value, we need to get a pointer to the
+// first byte and pass that to the tracing function.  To do this, we need to
+// allocate an array, store the vector data into that array, and return a
+// pointer to the first byte.
+static Value *createVectorArg(Value *vector, IRBuilder<> &IRB) {
+  Type* vector_type = vector->getType();
+  assert(vector_type->isVectorTy());
+  Value* alloca_size = ConstantInt::get(IRB.getInt64Ty(), 1);
+  AllocaInst *alloca = IRB.CreateAlloca(vector_type, alloca_size);
+  StoreInst *store = IRB.CreateAlignedStore(
+      vector, alloca, vector_type->getScalarSizeInBits() / 8);
+  Value* bitcast = IRB.CreatePointerCast(alloca, IRB.getInt8PtrTy());
+  return bitcast;
+}
+
 static Constant *createStringArg(const char *string, Module *curr_module) {
     Constant *v_string =
         ConstantDataArray::getString(curr_module->getContext(), string, true);
@@ -206,6 +222,9 @@ bool Tracer::doInitialization(Module &M) {
 
   TL_log_double = M.getOrInsertFunction( "trace_logger_log_double", VoidTy,
       I64Ty, I64Ty, DoubleTy, I64Ty, I8PtrTy, I64Ty, I8PtrTy, nullptr);
+
+  TL_log_vector = M.getOrInsertFunction( "trace_logger_log_vector", VoidTy,
+      I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy, I64Ty, I8PtrTy, nullptr);
 
   if (func_string.empty()) {
     errs() << "\n\nPlease set WORKLOAD as an environment variable!\n\n\n";
@@ -406,6 +425,13 @@ void Tracer::printParamLine(Instruction *I, int param_num, const char *reg_id,
       Value *args[] = { v_param_num,    v_size,   v_value,     v_is_reg,
                         vv_reg_id, v_is_phi, vv_prev_bbid };
       IRB.CreateCall(TL_log_int, args);
+    } else if (datatype == llvm::Type::VectorTyID) {
+      // Give the logger function a pointer to the data. We'll read it out in
+      // the logger function itself.
+      Value *v_value = createVectorArg(value, IRB);
+      Value *args[] = { v_param_num,    v_size,   v_value,     v_is_reg,
+                        vv_reg_id, v_is_phi, vv_prev_bbid };
+      IRB.CreateCall(TL_log_vector, args);
     } else {
       fprintf(stderr, "normal data else: %d, %s\n", datatype, reg_id);
     }
@@ -638,7 +664,7 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
       params.datatype = itr->getType()->getTypeID();
       params.datasize = getMemSize(itr->getType());
       if (itr->getType()->isVectorTy()) {
-        params.value = nullptr;
+        params.value = itr;
       } else if (itr->isTerminator()) {
         assert(false && "It is terminator...\n");
       } else {
@@ -717,13 +743,11 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
       // that instruction could be a phi node).
       setOperandNameAndReg(I, &caller);
 
-      if (!curr_operand->getType()->isVectorTy()) {
-        // We don't want to print the value of a vector type.
-        caller.setDataTypeAndSize(curr_operand);
-        callee.setDataTypeAndSize(curr_operand);
-        caller.value = curr_operand;
-        callee.value = curr_operand;
-      }
+      // We don't want to print the value of a vector type.
+      caller.setDataTypeAndSize(curr_operand);
+      callee.setDataTypeAndSize(curr_operand);
+      caller.value = curr_operand;
+      callee.value = curr_operand;
       printParamLine(inst, &caller);
       printParamLine(inst, &callee);
     } else {
@@ -733,6 +757,8 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
       caller.is_reg = curr_operand->hasName();
       if (curr_operand->getType()->isVectorTy()) {
         // Nothing to do - again, don't print the value.
+        caller.value = curr_operand;
+        callee.value = curr_operand;
       } else if (curr_operand->getType()->isLabelTy()) {
         // The operand name should be the code label itself. It has no value.
         makeValueId(curr_operand, caller.operand_name);
@@ -768,12 +794,10 @@ void Tracer::handleNonPhiNonCallInstruction(Instruction *inst, InstEnv* env) {
 
       if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
         setOperandNameAndReg(I, &params);
-        if (!curr_operand->getType()->isVectorTy()) {
-          params.value = curr_operand;
-        }
+        params.value = curr_operand;
       } else {
         if (curr_operand->getType()->isVectorTy()) {
-          // Nothing more to do.
+          params.value = curr_operand;
         } else if (curr_operand->getType()->isLabelTy()) {
           makeValueId(curr_operand, params.operand_name);
           params.is_reg = true;
@@ -813,7 +837,7 @@ void Tracer::handleInstructionResult(Instruction *inst, Instruction *next_inst,
   params.bbid = nullptr;
   params.setDataTypeAndSize(inst);
   if (inst->getType()->isVectorTy()) {
-    // Nothing more to do.
+    params.value = inst;
   } else if (inst->isTerminator()) {
     assert(false && "Return instruction is terminator...\n");
   } else {
