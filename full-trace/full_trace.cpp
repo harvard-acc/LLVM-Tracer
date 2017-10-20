@@ -817,14 +817,14 @@ void Tracer::handleInstructionResult(Instruction *inst, Instruction *next_inst,
                                      InstEnv *env) {
   // Bitcasts are a special instruction in that if the operand is a pointer,
   // the result still refers to the original address. If the result of the
-  // bitcast is not named, use the name of the input operand and add a mapping
-  // from slot id to name.
+  // bitcast is not named but the input operand is, use the name of the input
+  // operand and add a mapping from slot id to name.
   BitCastInst* bitcast = dyn_cast<BitCastInst>(inst);
   if (bitcast) {
     Value* operand = bitcast->getOperand(0);
     int id = st->getLocalSlot(bitcast);
     if (slotToVarName.find(id) == slotToVarName.end() &&
-        operand->getType()->isPointerTy()) {
+        operand->getType()->isPointerTy() && operand->hasName()) {
       strcpy(env->instid, operand->getName().str().c_str());
       slotToVarName[id] = env->instid;
     }
