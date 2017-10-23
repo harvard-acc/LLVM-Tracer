@@ -743,7 +743,6 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
       // that instruction could be a phi node).
       setOperandNameAndReg(I, &caller);
 
-      // We don't want to print the value of a vector type.
       caller.setDataTypeAndSize(curr_operand);
       callee.setDataTypeAndSize(curr_operand);
       caller.value = curr_operand;
@@ -755,11 +754,7 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
       // constant, a local variable produced by a different basic block, a
       // global, a function argument, a code label, or something else.
       caller.is_reg = curr_operand->hasName();
-      if (curr_operand->getType()->isVectorTy()) {
-        // Nothing to do - again, don't print the value.
-        caller.value = curr_operand;
-        callee.value = curr_operand;
-      } else if (curr_operand->getType()->isLabelTy()) {
+      if (curr_operand->getType()->isLabelTy()) {
         // The operand name should be the code label itself. It has no value.
         makeValueId(curr_operand, caller.operand_name);
         caller.is_reg = true;
