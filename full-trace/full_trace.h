@@ -94,6 +94,17 @@ class Tracer : public FunctionPass {
     void handleInstructionResult(Instruction *inst, Instruction *next_inst,
                                  InstEnv *env);
 
+    // Instrument function arguments for print-out upon entry.
+    //
+    // By printing the arguments from WITHIN the called function, rather than
+    // OUTSIDE at the Call instruction, we resolve the problem of potentially
+    // not knowing the complete function signature information.  This is
+    // because the function may be defined in a different module than the one
+    // from which it is being called, and in this case, it's impossible to know
+    // what the function argument names are until we run the optimization pass
+    // on that module.
+    bool runOnFunctionEntry(Function& func);
+
     // Set line number information in env for this inst if it is found.
     void setLineNumberIfExists(Instruction *I, InstEnv *env);
 
@@ -120,11 +131,13 @@ class Tracer : public FunctionPass {
     void printParamLine(Instruction *I, InstOperandParams *params);
 
     // Should we trace this function or not?
-    bool traceOrNot(std::string& func);
+    bool traceOrNot(const std::string& func);
     // Does this function appear in our list of tracked functions?
-    bool isTrackedFunction(std::string& func);
+    bool isTrackedFunction(const std::string& func);
     // Is this function one of the special DMA functions?
     bool isDmaFunction(std::string& funcName);
+    // Is this function an LLVM intrinsic?
+    bool isLLVMIntrinsic(const std::string& func);
 
     // Construct an ID for the given instruction.
     //
@@ -188,6 +201,7 @@ class Tracer : public FunctionPass {
     // References to the logging functions.
     Value *TL_log0;
     Value *TL_log_int;
+    Value *TL_log_ptr;
     Value *TL_log_double;
     Value *TL_log_vector;
 

@@ -204,6 +204,9 @@ bool Tracer::doInitialization(Module &M) {
   TL_log_int = M.getOrInsertFunction( "trace_logger_log_int", VoidTy,
       I64Ty, I64Ty, I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy, nullptr);
 
+  TL_log_ptr = M.getOrInsertFunction( "trace_logger_log_ptr", VoidTy,
+      I64Ty, I64Ty, I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy, nullptr);
+
   TL_log_double = M.getOrInsertFunction( "trace_logger_log_double", VoidTy,
       I64Ty, I64Ty, DoubleTy, I64Ty, I8PtrTy, I64Ty, I8PtrTy, nullptr);
 
@@ -267,6 +270,8 @@ bool Tracer::doInitialization(Module &M) {
 }
 
 bool Tracer::runOnFunction(Function &F) {
+  bool func_modified = false;
+
   if (curr_function != &F) {
     st->purgeFunction();
     st->incorporateFunction(&F);
@@ -279,9 +284,10 @@ bool Tracer::runOnFunction(Function &F) {
 
   for (auto bb_it = F.begin(); bb_it != F.end(); ++bb_it) {
     BasicBlock& bb = *bb_it;
-    runOnBasicBlock(bb);
+    func_modified = runOnBasicBlock(bb);
   }
-  return false;
+  func_modified |= runOnFunctionEntry(F);
+  return func_modified;
 }
 
 bool Tracer::runOnBasicBlock(BasicBlock &BB) {
@@ -353,24 +359,69 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
       processAllocaInstruction(itr);
     }
   }
-  return false;
+
+  // Conservatively assume that we changed the basic block.
+  return true;
 }
 
+bool Tracer::runOnFunctionEntry(Function& func) {
+  // We have to get the first insertion point before we insert any
+  // instrumentation!
+  BasicBlock* first_bb = func.begin();
+  BasicBlock::iterator insertp = first_bb->getFirstInsertionPt();
+  Function::ArgumentListType &args(func.getArgumentList());
+  std::string funcName = func.getName().str();
 
-bool Tracer::traceOrNot(std::string& func) {
+  int call_id = 1;
+  for (Function::ArgumentListType::iterator arg_it = args.begin(),
+                                            arg_end = args.end();
+       arg_it != arg_end; ++arg_it, ++call_id) {
+    char arg_name_buf[256];
+    InstOperandParams params;
+    params.param_num = FORWARD_LINE;
+    params.operand_name = arg_name_buf;
+    params.setDataTypeAndSize(arg_it);
+    params.is_reg = arg_it->hasName();
+    params.bbid = nullptr;
+
+    if (arg_it->getType()->isLabelTy()) {
+      // The operand name should be the code label itself. It has no value.
+      makeValueId(arg_it, params.operand_name);
+      params.is_reg = true;
+    } else if (arg_it->getValueID() == Value::FunctionVal) {
+      // Nothing to do.
+    } else {
+      // This argument has a value to print.
+      strncpy(params.operand_name, arg_it->getName().str().c_str(),
+              sizeof(arg_name_buf));
+      params.operand_name[255] = 0;
+      params.value = arg_it;
+    }
+
+    printParamLine(insertp, &params);
+  }
+
+  return true;
+}
+
+bool Tracer::traceOrNot(const std::string& func) {
   if (isTrackedFunction(func))
     return true;
-  for (size_t i = 0; i < intrinsics.size(); i++) {
-    if (func == intrinsics[i])
+  return isLLVMIntrinsic(func);
+}
+
+bool Tracer::isTrackedFunction(const std::string& func) {
+  // perform search in log(n) time.
+  std::set<std::string>::iterator it = this->tracked_functions.find(func);
+  if (it != this->tracked_functions.end()) {
       return true;
   }
   return false;
 }
 
-bool Tracer::isTrackedFunction(std::string& func) {
-  // perform search in log(n) time.
-  std::set<std::string>::iterator it = this->tracked_functions.find(func);
-  if (it != this->tracked_functions.end()) {
+bool Tracer::isLLVMIntrinsic(const std::string& func) {
+  for (size_t i = 0; i < intrinsics.size(); i++) {
+    if (func == intrinsics[i])
       return true;
   }
   return false;
@@ -411,7 +462,7 @@ void Tracer::printParamLine(Instruction *I, int param_num, const char *reg_id,
       Value *v_value = IRB.CreatePtrToInt(value, IRB.getInt64Ty());
       Value *args[] = { v_param_num,    v_size,   v_value,     v_is_reg,
                         vv_reg_id, v_is_phi, vv_prev_bbid };
-      IRB.CreateCall(TL_log_int, args);
+      IRB.CreateCall(TL_log_ptr, args);
     } else if (datatype == llvm::Type::VectorTyID) {
       // Give the logger function a pointer to the data. We'll read it out in
       // the logger function itself.
@@ -664,7 +715,6 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
 
 void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
   char caller_op_name[256];
-  char callee_op_name[256];
 
   CallInst *CI = dyn_cast<CallInst>(inst);
   Function *fun = CI->getCalledFunction();
@@ -708,22 +758,17 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
 
     // Every argument in the function call will have two lines printed,
     // reflecting the state of the operand in the caller AND callee function.
+    // However, the callee lines will be printed by the callee function itself
+    // (after we have entered the function), rather than at the site of the
+    // Call instruction.
     InstOperandParams caller;
-    InstOperandParams callee;
 
     caller.param_num = call_id + 1;
     caller.operand_name = caller_op_name;
     caller.bbid = nullptr;
 
-    callee.param_num = FORWARD_LINE;
-    callee.operand_name = callee_op_name;
-    callee.is_reg = true;
-    callee.bbid = nullptr;
-
     caller.setDataTypeAndSize(curr_operand);
-    callee.setDataTypeAndSize(curr_operand);
     strcpy(caller.operand_name, curr_operand->getName().str().c_str());
-    strcpy(callee.operand_name, arg_it->getName().str().c_str());
 
     if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
       // This operand was produced by an instruction in this basic block (and
@@ -731,11 +776,8 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
       setOperandNameAndReg(I, &caller);
 
       caller.setDataTypeAndSize(curr_operand);
-      callee.setDataTypeAndSize(curr_operand);
       caller.value = curr_operand;
-      callee.value = curr_operand;
       printParamLine(inst, &caller);
-      printParamLine(inst, &callee);
     } else {
       // This operand was not produced by this basic block. It may be a
       // constant, a local variable produced by a different basic block, a
@@ -751,10 +793,8 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
       } else {
         // This operand does have a value to print.
         caller.value = curr_operand;
-        callee.value = curr_operand;
       }
       printParamLine(inst, &caller);
-      printParamLine(inst, &callee);
     }
   }
 }

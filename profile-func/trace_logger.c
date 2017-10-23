@@ -188,6 +188,28 @@ void trace_logger_log_int(int line, int size, int64_t value, int is_reg,
   else
     gzprintf(full_trace_file, ",\n");
 }
+
+void trace_logger_log_ptr(int line, int size, uint64_t value, int is_reg,
+                          char *label, int is_phi, char *prev_bbid) {
+  assert(initp == true);
+  if (do_not_log())
+    return;
+  if (line == RESULT_LINE)
+    gzprintf(full_trace_file, "r,%d,%#llx,%d", size, value, is_reg);
+  else if (line == FORWARD_LINE)
+    gzprintf(full_trace_file, "f,%d,%#llx,%d", size, value, is_reg);
+  else
+    gzprintf(full_trace_file, "%d,%d,%#llx,%d", line, size, value, is_reg);
+  if (is_reg)
+    gzprintf(full_trace_file, ",%s", label);
+  else
+    gzprintf(full_trace_file, ", ");
+  if (is_phi)
+    gzprintf(full_trace_file, ",%s,\n", prev_bbid);
+  else
+    gzprintf(full_trace_file, ",\n");
+}
+
 void trace_logger_log_double(int line, int size, double value, int is_reg,
                              char *label, int is_phi, char *prev_bbid) {
   assert(initp == true);
