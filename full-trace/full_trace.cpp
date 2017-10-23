@@ -197,7 +197,10 @@ bool Tracer::doInitialization(Module &M) {
   auto VoidTy = Type::getVoidTy(llvm_context);
   auto DoubleTy = Type::getDoubleTy(llvm_context);
 
-  // Add external trace_logger function declaratio
+  // Add external trace_logger function declarations.
+  TL_log_entry = M.getOrInsertFunction("trace_logger_log_entry", VoidTy,
+                                       I8PtrTy, I64Ty, nullptr);
+
   TL_log0 = M.getOrInsertFunction( "trace_logger_log0", VoidTy,
       I64Ty, I8PtrTy, I8PtrTy, I8PtrTy, I64Ty, I1Ty, I1Ty, nullptr);
 
@@ -286,7 +289,8 @@ bool Tracer::runOnFunction(Function &F) {
     BasicBlock& bb = *bb_it;
     func_modified = runOnBasicBlock(bb);
   }
-  func_modified |= runOnFunctionEntry(F);
+  if (F.getName() != "main")
+    func_modified |= runOnFunctionEntry(F);
   return func_modified;
 }
 
@@ -369,8 +373,28 @@ bool Tracer::runOnFunctionEntry(Function& func) {
   // instrumentation!
   BasicBlock* first_bb = func.begin();
   BasicBlock::iterator insertp = first_bb->getFirstInsertionPt();
+
+  // Fast forward past any vector buffer alloca instructions we find at the
+  // beginning of the function block. If we don't do this, we might try to
+  // insert instrumentation before an alloca instruction we attempt to reuse.
+  for (; insertp != first_bb->end();) {
+    if (AllocaInst* alloca = dyn_cast<AllocaInst>(insertp)) {
+      if (alloca->hasName() && alloca->getName().startswith("alloca.vecbuf.")) {
+        ++insertp;
+        continue;
+      }
+    }
+    break;
+  }
+
   Function::ArgumentListType &args(func.getArgumentList());
   std::string funcName = func.getName().str();
+  bool is_entry_block = isTrackedFunction(funcName) && is_toplevel_mode;
+  if (is_entry_block) {
+    InstEnv env;
+    strncpy(env.funcName, funcName.c_str(), InstEnv::BUF_SIZE);
+    printTopLevelEntryFirstLine(insertp, &env, args.size());
+  }
 
   int call_id = 1;
   for (Function::ArgumentListType::iterator arg_it = args.begin(),
@@ -378,7 +402,7 @@ bool Tracer::runOnFunctionEntry(Function& func) {
        arg_it != arg_end; ++arg_it, ++call_id) {
     char arg_name_buf[256];
     InstOperandParams params;
-    params.param_num = FORWARD_LINE;
+    params.param_num = is_entry_block ? call_id : FORWARD_LINE;
     params.operand_name = arg_name_buf;
     params.setDataTypeAndSize(arg_it);
     params.is_reg = arg_it->hasName();
@@ -504,6 +528,15 @@ void Tracer::printFirstLine(Instruction *I, InstEnv *env, unsigned opcode) {
                     vv_inst,           v_opty,       v_is_tracked_function,
                     v_is_toplevel_mode };
   IRB.CreateCall(TL_log0, args);
+}
+
+void Tracer::printTopLevelEntryFirstLine(Instruction *I, InstEnv *env,
+                                         int num_params) {
+  IRBuilder<> IRB(I);
+  Constant *vv_func_name = createStringArg(env->funcName, curr_module);
+  Value* v_num_params = ConstantInt::get(IRB.getInt64Ty(), num_params);
+  Value *args[] = { vv_func_name, v_num_params };
+  IRB.CreateCall(TL_log_entry, args);
 }
 
 unsigned Tracer::opcodeToFixedPoint(unsigned opcode) {

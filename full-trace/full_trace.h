@@ -130,6 +130,12 @@ class Tracer : public FunctionPass {
 
     void printParamLine(Instruction *I, InstOperandParams *params);
 
+    // Print the first line of a top-level function signature.
+    //
+    // This has the form "entry,func_name,num_params".
+    void printTopLevelEntryFirstLine(Instruction *I, InstEnv *env,
+                                     int num_params);
+
     // Should we trace this function or not?
     bool traceOrNot(const std::string& func);
     // Does this function appear in our list of tracked functions?
@@ -204,6 +210,7 @@ class Tracer : public FunctionPass {
     Value *TL_log_ptr;
     Value *TL_log_double;
     Value *TL_log_vector;
+    Value *TL_log_entry;
 
     // The current module.
     Module *curr_module;

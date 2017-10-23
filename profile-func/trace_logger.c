@@ -126,17 +126,21 @@ logging_status log_or_not(bool is_toplevel_mode, bool is_toplevel_function,
   return LOG_AND_CONTINUE;
 }
 
-bool do_not_log() {
-  return current_logging_status == DO_NOT_LOG;
+// Convert @size bytes in the buffer @value to a hex string, stored in @buf.
+//
+// The output string is prefixed by 0x and is null terminated. The output does
+// NOT account for endianness!
+void convert_bytes_to_hex(char* buf, uint8_t* value, int size) {
+  sprintf(buf, "0x");
+  buf += 2;
+  for (int i = 0; i < size; i++) {
+    buf += sprintf(buf, "%02x", value[i]);
+  }
+  *buf = 0;
 }
 
-void trace_logger_log0(int line_number, char *name, char *bbid, char *instid,
-                       int opcode, bool is_tracked_function, bool is_toplevel_mode) {
-  if (!initp) {
-    trace_logger_init();
-    initp = true;
-  }
-
+void update_logging_status(char *name, int opcode, bool is_tracked_function,
+                           bool is_toplevel_mode) {
   // LOG_AND_STOP would have been set by the previous instruction (which should
   // be logged), and this is already the next one, so STOP.
   if (current_logging_status == LOG_AND_STOP) {
@@ -159,7 +163,36 @@ void trace_logger_log0(int line_number, char *name, char *bbid, char *instid,
   } else if (current_logging_status == LOG_AND_STOP) {
     memset(current_toplevel_function, 0, MAX_FUNC_NAME_LEN);
   }
+}
 
+bool do_not_log() {
+  return current_logging_status == DO_NOT_LOG;
+}
+
+void trace_logger_log_entry(char *func_name, int num_parameters) {
+  if (!initp) {
+    trace_logger_init();
+    initp = true;
+  }
+
+  // The opcode doesn't matter, as long as it's not RET_OP, and this
+  // instrumentation function will only be inserted if we are in top-level mode
+  // and the function is a tracked function.
+  update_logging_status(func_name, 0, true, true);
+  if (current_logging_status == DO_NOT_LOG)
+    return;
+
+  gzprintf(full_trace_file, "\nentry,%s,%d,\n", func_name, num_parameters);
+}
+
+void trace_logger_log0(int line_number, char *name, char *bbid, char *instid,
+                       int opcode, bool is_tracked_function, bool is_toplevel_mode) {
+  if (!initp) {
+    trace_logger_init();
+    initp = true;
+  }
+
+  update_logging_status(name, opcode, is_tracked_function, is_toplevel_mode);
   if (current_logging_status == DO_NOT_LOG)
     return;
 
@@ -229,19 +262,6 @@ void trace_logger_log_double(int line, int size, double value, int is_reg,
     gzprintf(full_trace_file, ",%s,\n", prev_bbid);
   else
     gzprintf(full_trace_file, ",\n");
-}
-
-// Convert @size bytes in the buffer @value to a hex string, stored in @buf.
-//
-// The output string is prefixed by 0x and is null terminated. The output does
-// NOT account for endianness!
-void convert_bytes_to_hex(char* buf, uint8_t* value, int size) {
-  sprintf(buf, "0x");
-  buf += 2;
-  for (int i = 0; i < size; i++) {
-    buf += sprintf(buf, "%02x", value[i]);
-  }
-  *buf = 0;
 }
 
 void trace_logger_log_vector(int line, int size, uint8_t* value, int is_reg,
