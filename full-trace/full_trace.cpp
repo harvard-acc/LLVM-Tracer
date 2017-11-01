@@ -712,15 +712,10 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
         if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
           setOperandNameAndReg(I, &params);
           params.value = nullptr;
-          if (!curr_operand->getType()->isVectorTy()) {
-            params.setDataTypeAndSize(curr_operand);
-          }
         } else {
           params.is_reg = curr_operand->hasName();
           strcpy(params.operand_name, curr_operand->getName().str().c_str());
-          if (!curr_operand->getType()->isVectorTy()) {
-            params.value = curr_operand;
-          }
+          params.value = curr_operand;
         }
         printParamLine(insertp, &params);
       }
@@ -734,9 +729,7 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
       params.bbid = nullptr;
       params.datatype = itr->getType()->getTypeID();
       params.datasize = getMemSize(itr->getType());
-      if (itr->getType()->isVectorTy()) {
-        params.value = itr;
-      } else if (itr->isTerminator()) {
+      if (itr->isTerminator()) {
         assert(false && "It is terminator...\n");
       } else {
         params.value = itr;
