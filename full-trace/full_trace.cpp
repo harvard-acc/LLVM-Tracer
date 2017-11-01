@@ -106,22 +106,6 @@ std::vector<std::string> intrinsics = {
 
 }// end of anonymous namespace
 
-// The vector data is not guaranteed to have a memory address (it could be just
-// a register). In order to print the value, we need to get a pointer to the
-// first byte and pass that to the tracing function.  To do this, we need to
-// allocate an array, store the vector data into that array, and return a
-// pointer to the first byte.
-static Value *createVectorArg(Value *vector, IRBuilder<> &IRB) {
-  Type* vector_type = vector->getType();
-  assert(vector_type->isVectorTy());
-  Value* alloca_size = ConstantInt::get(IRB.getInt64Ty(), 1);
-  AllocaInst *alloca = IRB.CreateAlloca(vector_type, alloca_size);
-  StoreInst *store = IRB.CreateAlignedStore(
-      vector, alloca, vector_type->getScalarSizeInBits() / 8);
-  Value* bitcast = IRB.CreatePointerCast(alloca, IRB.getInt8PtrTy());
-  return bitcast;
-}
-
 static Constant *createStringArg(const char *string, Module *curr_module) {
     Constant *v_string =
         ConstantDataArray::getString(curr_module->getContext(), string, true);
@@ -283,6 +267,16 @@ bool Tracer::doInitialization(Module &M) {
 }
 
 bool Tracer::runOnFunction(Function &F) {
+  if (curr_function != &F) {
+    st->purgeFunction();
+    st->incorporateFunction(&F);
+    curr_function = &F;
+    slotToVarName.clear();
+  }
+
+  // Stack allocated buffers can't be reused across functions of course.
+  vector_buffers.clear();
+
   for (auto bb_it = F.begin(); bb_it != F.end(); ++bb_it) {
     BasicBlock& bb = *bb_it;
     runOnBasicBlock(bb);
@@ -299,13 +293,6 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
   // trace as fixed-point ops instead.
   if (funcName.rfind("_fxp", funcName.size() - 4) != std::string::npos)
     env.to_fxpt = true;
-
-  if (curr_function != func) {
-    st->purgeFunction();
-    st->incorporateFunction(func);
-    curr_function = func;
-    slotToVarName.clear();
-  }
 
   if (!is_toplevel_mode && !isTrackedFunction(funcName))
     return false;
@@ -839,6 +826,30 @@ void Tracer::handleInstructionResult(Instruction *inst, Instruction *next_inst,
     params.value = inst;
   }
   printParamLine(next_inst, &params);
+}
+
+Value *Tracer::createVectorArg(Value *vector, IRBuilder<> &IRB) {
+  Type* vector_type = vector->getType();
+  assert(vector_type->isVectorTy());
+  unsigned vector_size = vector_type->getScalarSizeInBits() / 8;
+  AllocaInst* alloca;
+  if (vector_buffers.find(vector_size) == vector_buffers.end()) {
+    // If we don't find a pre-allocated buffer of this size, we allocate a new
+    // one. Critically, we insert the alloca instruction at the very beginning
+    // of the function to ensure that it dominates all uses.
+    BasicBlock::iterator insertp = curr_function->front().getFirstInsertionPt();
+    IRBuilder<> alloca_builder(insertp);
+    Value *alloca_size = ConstantInt::get(IRB.getInt64Ty(), 1);
+    std::string id = std::to_string(vector_size);
+    alloca = alloca_builder.CreateAlloca(vector_type, alloca_size,
+                                         "alloca.vecbuf." + id);
+    vector_buffers[vector_size] = alloca;
+  } else {
+    alloca = vector_buffers.at(vector_size);
+  }
+  IRB.CreateAlignedStore(vector, alloca, vector_size);
+  Value *bitcast = IRB.CreatePointerCast(alloca, IRB.getInt8PtrTy());
+  return bitcast;
 }
 
 void Tracer::getAnalysisUsage(AnalysisUsage& Info) const {

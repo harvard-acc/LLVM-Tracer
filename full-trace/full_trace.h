@@ -172,6 +172,19 @@ class Tracer : public FunctionPass {
     // etc.), return the input opcode.
     unsigned opcodeToFixedPoint(unsigned opcode);
 
+    // Return a pointer to this vector value.
+    //
+    // The vector data is not guaranteed to have a memory address (it could be
+    // just a register). In order to print the value, we need to get a pointer
+    // to the first byte and pass that to the tracing function.  To do this, we
+    // need to allocate a buffer, store the vector data into that buffer, and
+    // return a pointer to the buffer.
+    //
+    // The buffer is allocated on the stack, so it can and SHOULD be reused;
+    // otherwise, for vector-heavy workloads, we will easily run into the stack
+    // size limit.
+    Value *createVectorArg(Value *vector, IRBuilder<> &IRB);
+
     // References to the logging functions.
     Value *TL_log0;
     Value *TL_log_int;
@@ -194,7 +207,12 @@ class Tracer : public FunctionPass {
     // will track all functions called by it (the top-level function).
     bool is_toplevel_mode;
 
-  private:
+    // Map of stack-allocated vector buffers and their sizes.
+    //
+    // Whenever we need a buffer, we look up its size to see if we already have
+    // one allocated, and return a pointer to that buffer if so.
+    std::map<unsigned, AllocaInst*> vector_buffers;
+
     // Stores names of local variables allocated by alloca.
     //
     // For alloca instructions that allocate local memory, this maps the
