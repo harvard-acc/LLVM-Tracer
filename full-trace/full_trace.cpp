@@ -467,8 +467,8 @@ void Tracer::printParamLine(Instruction *I, int param_num, const char *reg_id,
   Value *v_size = ConstantInt::get(IRB.getInt64Ty(), datasize);
   Value *v_is_reg = ConstantInt::get(IRB.getInt64Ty(), is_reg);
   Value *v_is_phi = ConstantInt::get(IRB.getInt64Ty(), is_phi);
-  Constant *vv_reg_id = createStringArg(reg_id, curr_module);
-  Constant *vv_prev_bbid = createStringArg(prev_bbid, curr_module);
+  Constant *vv_reg_id = createStringArgIfNotExists(reg_id);
+  Constant *vv_prev_bbid = createStringArgIfNotExists(prev_bbid);
 
   if (value != nullptr) {
     if (datatype == llvm::Type::IntegerTyID) {
@@ -521,9 +521,9 @@ void Tracer::printFirstLine(Instruction *I, InstEnv *env, unsigned opcode) {
       IRB.getInt1Ty(),
       (tracked_functions.find(env->funcName) != tracked_functions.end()));
   v_is_toplevel_mode = ConstantInt::get(IRB.getInt1Ty(), is_toplevel_mode);
-  Constant *vv_func_name = createStringArg(env->funcName, curr_module);
-  Constant *vv_bb = createStringArg(env->bbid, curr_module);
-  Constant *vv_inst = createStringArg(env->instid, curr_module);
+  Constant *vv_func_name = createStringArgIfNotExists(env->funcName);
+  Constant *vv_bb = createStringArgIfNotExists(env->bbid);
+  Constant *vv_inst = createStringArgIfNotExists(env->instid);
   Value *args[] = { v_linenumber,      vv_func_name, vv_bb,
                     vv_inst,           v_opty,       v_is_tracked_function,
                     v_is_toplevel_mode };
@@ -533,7 +533,7 @@ void Tracer::printFirstLine(Instruction *I, InstEnv *env, unsigned opcode) {
 void Tracer::printTopLevelEntryFirstLine(Instruction *I, InstEnv *env,
                                          int num_params) {
   IRBuilder<> IRB(I);
-  Constant *vv_func_name = createStringArg(env->funcName, curr_module);
+  Constant *vv_func_name = createStringArgIfNotExists(env->funcName);
   Value* v_num_params = ConstantInt::get(IRB.getInt64Ty(), num_params);
   Value *args[] = { vv_func_name, v_num_params };
   IRB.CreateCall(TL_log_entry, args);
@@ -892,6 +892,14 @@ void Tracer::handleInstructionResult(Instruction *inst, Instruction *next_inst,
     params.value = inst;
   }
   printParamLine(next_inst, &params);
+}
+
+Constant *Tracer::createStringArgIfNotExists(const char *str) {
+  std::string key(str);
+  if (global_strings.find(key) == global_strings.end()) {
+    global_strings[key] = createStringArg(str, curr_module);
+  }
+  return global_strings[key];
 }
 
 Value *Tracer::createVectorArg(Value *vector, IRBuilder<> &IRB) {

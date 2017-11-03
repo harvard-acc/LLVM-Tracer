@@ -204,6 +204,13 @@ class Tracer : public FunctionPass {
     // size limit.
     Value *createVectorArg(Value *vector, IRBuilder<> &IRB);
 
+    // Get a global string constant for str.
+    //
+    // If such a string has not been allocated a global variable before, then
+    // create the argument and return the pointer to the Constant; otherwise,
+    // just return the Constant*.
+    Constant *createStringArgIfNotExists(const char *str);
+
     // References to the logging functions.
     Value *TL_log0;
     Value *TL_log_int;
@@ -233,6 +240,9 @@ class Tracer : public FunctionPass {
     // Whenever we need a buffer, we look up its size to see if we already have
     // one allocated, and return a pointer to that buffer if so.
     std::map<unsigned, AllocaInst*> vector_buffers;
+
+    // Map of strings to newly created global variables storing them.
+    std::map<std::string, Constant*> global_strings;
 
     // Stores names of local variables allocated by alloca.
     //
