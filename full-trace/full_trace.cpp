@@ -29,6 +29,7 @@
 
 #define RESULT_LINE 19134
 #define FORWARD_LINE 24601
+#define SET_READY_BITS 95
 #define DMA_FENCE 97
 #define DMA_STORE 98
 #define DMA_LOAD 99
@@ -665,7 +666,8 @@ void Tracer::makeValueId(Value *value, char *id_str) {
 bool Tracer::isDmaFunction(std::string& funcName) {
   return (funcName == "dmaLoad" ||
           funcName == "dmaStore" ||
-          funcName == "dmaFence");
+          funcName == "dmaFence" ||
+          funcName == "setReadyBits");
 }
 
 void Tracer::setLineNumberIfExists(Instruction *I, InstEnv *env) {
@@ -746,15 +748,17 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
   Function *fun = CI->getCalledFunction();
   strcpy(caller_op_name, (char *)fun->getName().str().c_str());
   unsigned opcode;
-  if (fun->getName().str().find("dmaLoad") != std::string::npos)
+  if (fun->getName() == "dmaLoad")
     opcode = DMA_LOAD;
-  else if (fun->getName().str().find("dmaStore") != std::string::npos)
+  else if (fun->getName() == "dmaStore")
     opcode = DMA_STORE;
-  else if (fun->getName().str().find("dmaFence") != std::string::npos)
+  else if (fun->getName() == "dmaFence")
     opcode = DMA_FENCE;
-  else if (fun->getName().str().find("sin") != std::string::npos)
+  else if (fun->getName() == "setReadyBits")
+    opcode = SET_READY_BITS;
+  else if (fun->getName() == "sin")
     opcode = SINE;
-  else if (fun->getName().str().find("cos") != std::string::npos)
+  else if (fun->getName() == "cos")
     opcode = COSINE;
   else
     opcode = inst->getOpcode();
