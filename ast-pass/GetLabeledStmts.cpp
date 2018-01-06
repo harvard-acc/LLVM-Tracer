@@ -228,8 +228,10 @@ class LabeledStmtFrontendAction : public ASTFrontendAction {
                                    unsigned line_number,
                                    std::list<std::string> callers) {
     ofs << function << "/" << label << " " << line_number;
-    if (callers.size() == 0)
+    if (callers.size() == 0) {
+      ofs << "\n";
       return;
+    }
     ofs << " inline";
     for (auto caller : callers)
       ofs << " " << caller;
