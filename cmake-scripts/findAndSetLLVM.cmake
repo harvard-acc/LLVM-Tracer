@@ -32,6 +32,10 @@ add_definitions("-DLLVM_VERSION=${LLVM_NO_DOT_VERSION}")
 # probably some llvm-config work to do...
 SET(REQ_LLVM_LIBRARIES ${LLVM_LIBS})
 
+# Our required version of ZLIB is newer than what is available by default
+# through apt and other package managers.
+find_package(ZLIB 1.2.10 REQUIRED)
+
 # For debug use only
 if(${TEST_CMAKE})
   message("debug messages below")
