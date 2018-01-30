@@ -36,7 +36,6 @@ logging_status current_logging_status;
 void trace_logger_write_labelmap(char* labelmap_buf, size_t labelmap_size) {
     if (!initp) {
       trace_logger_init();
-      initp = true;
     }
     const char* section_header = "%%%% LABEL MAP START %%%%\n";
     const char* section_footer = "%%%% LABEL MAP END %%%%\n\n";
@@ -57,6 +56,7 @@ void trace_logger_init() {
   current_logging_status = DO_NOT_LOG;
 
   atexit(&trace_logger_fin);
+  initp = true;
 }
 
 void trace_logger_fin() {
@@ -172,7 +172,6 @@ bool do_not_log() {
 void trace_logger_log_entry(char *func_name, int num_parameters) {
   if (!initp) {
     trace_logger_init();
-    initp = true;
   }
 
   // The opcode doesn't matter, as long as it's not RET_OP, and this
@@ -189,7 +188,6 @@ void trace_logger_log0(int line_number, char *name, char *bbid, char *instid,
                        int opcode, bool is_tracked_function, bool is_toplevel_mode) {
   if (!initp) {
     trace_logger_init();
-    initp = true;
   }
 
   update_logging_status(name, opcode, is_tracked_function, is_toplevel_mode);

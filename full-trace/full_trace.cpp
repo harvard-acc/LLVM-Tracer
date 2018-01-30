@@ -972,21 +972,25 @@ bool LabelMapHandler::runOnModule(Module &M) {
     if (!main)
         return false;
 
-    bool ret = readLabelMap();
-    if (!ret)
-        return false;
-
-    if (verbose)
-      errs() << "Contents of labelmap:\n" << labelmap_str << "\n";
-
     IRBuilder<> builder(main->front().getFirstInsertionPt());
-    Function* labelMapWriter = cast<Function>(M.getOrInsertFunction(
-        "trace_logger_write_labelmap", builder.getVoidTy(),
-        builder.getInt8PtrTy(), builder.getInt64Ty(), nullptr));
-    Value *v_size = ConstantInt::get(builder.getInt64Ty(), labelmap_str.length());
-    Constant *v_buf = createStringArg(labelmap_str.c_str(), &M);
-    Value* args[] = { v_buf, v_size };
-    builder.CreateCall(labelMapWriter, args);
+    bool contains_labelmap = readLabelMap();
+    if (!contains_labelmap) {
+      Function *traceLoggerInit = cast<Function>(M.getOrInsertFunction(
+          "trace_logger_init", builder.getVoidTy(), nullptr));
+      builder.CreateCall(traceLoggerInit);
+    } else {
+      if (verbose)
+        errs() << "Contents of labelmap:\n" << labelmap_str << "\n";
+
+      Function *labelMapWriter = cast<Function>(M.getOrInsertFunction(
+          "trace_logger_write_labelmap", builder.getVoidTy(),
+          builder.getInt8PtrTy(), builder.getInt64Ty(), nullptr));
+      Value *v_size =
+          ConstantInt::get(builder.getInt64Ty(), labelmap_str.length());
+      Constant *v_buf = createStringArg(labelmap_str.c_str(), &M);
+      Value *args[] = {v_buf, v_size};
+      builder.CreateCall(labelMapWriter, args);
+    }
 
     return true;
 }
