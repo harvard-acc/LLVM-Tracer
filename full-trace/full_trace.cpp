@@ -35,6 +35,7 @@
 #define DMA_LOAD 99
 #define SINE 102
 #define COSINE 103
+#define INTRINSIC 104
 
 char s_phi[] = "phi";
 using namespace llvm;
@@ -69,6 +70,10 @@ namespace {
       }
   }
 
+// This list comprises the set of intrinsic functions we want to have appear in
+// the dynamic trace. If we see an intrinsic function, we'll compare its prefix
+// with the names here. A match occurs if one of these complete names and the
+// first N letters in the intrinsic function name are the same.
 std::vector<std::string> intrinsics = {
   "llvm.memcpy",  // standard C lib
   "llvm.memmove",
@@ -103,6 +108,7 @@ std::vector<std::string> intrinsics = {
   "llvm.smul.with.overflow",
   "llvm.umul.with.overflow",
   "llvm.fmuladd",  // specialised arithmetic
+  "llvm.x86.",  // x86 intrinsics
 };
 
 }// end of anonymous namespace
@@ -160,20 +166,20 @@ int getMemSize(Type *T) {
       size = 16 * 8;
       break;
     default:
-      fprintf(stderr, "!!Unknown floating point type size\n");
-      assert(false && "Unknown floating point type size");
+      errs() << "[ERROR]: Unknown floating point type " << *T << "\n";
+      assert(false);
     }
-  } else if (T->isIntegerTy())
+  } else if (T->isIntegerTy()) {
     size = cast<IntegerType>(T)->getBitWidth();
-  else if (T->isVectorTy())
+  } else if (T->isVectorTy()) {
     size = cast<VectorType>(T)->getBitWidth();
-  else if (T->isArrayTy()) {
+  } else if (T->isArrayTy()) {
     ArrayType *A = dyn_cast<ArrayType>(T);
     size = (int)A->getNumElements() *
            A->getElementType()->getPrimitiveSizeInBits();
   } else {
-    fprintf(stderr, "!!Unknown data type: %d\n", T->getTypeID());
-    assert(false && "Unknown data type");
+    errs() << "[ERROR]: Unknown data type " << *T << "\n";
+    assert(false);
   }
 
   return size;
@@ -336,19 +342,30 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
 
     bool traceCall = true;
     if (CallInst *I = dyn_cast<CallInst>(itr)) {
-      Function *fun = I->getCalledFunction();
-      // This is an indirect function invocation (i.e. through function
+      Function *called_func = I->getCalledFunction();
+      // This is an indirect function  invocation (i.e. through called_fun
       // pointer). This cannot happen for code that we want to turn into
-      // hardware, so skip it. Also, skip intrinsics.
-      if (!fun || fun->isIntrinsic())
+      // hardware, so skip it.
+      if (!called_func) {
         continue;
-      if (!is_toplevel_mode) {
-        std::string callfunc = fun->getName().str();
-        traceCall = traceOrNot(callfunc);
-        if (!traceCall)
-          continue;
+      }
+      const std::string &called_func_name = called_func->getName().str();
+      if (isLLVMIntrinsic(called_func_name)) {
+        // There are certain intrinsic functions which represent real work the
+        // accelerator may want to do, which we want to capture. These include
+        // special math operators, memcpy, and target-specific instructions.
+        // Intrinsics we don't want to capture are things like llvm.dbg.*.
+        traceCall = true;
+      } else if (!is_toplevel_mode) {
+        traceCall = traceOrNot(called_func_name);
+      } else if (called_func->isIntrinsic()) {
+        // Here we capture all the remaining intrinsic functions we DON'T want
+        // to trace.
+        traceCall = false;
       }
     }
+    if (!traceCall)
+      continue;
 
     if (isa<CallInst>(itr) && traceCall) {
       handleCallInstruction(itr, &env);
@@ -446,8 +463,10 @@ bool Tracer::isTrackedFunction(const std::string& func) {
 
 bool Tracer::isLLVMIntrinsic(const std::string& func) {
   for (size_t i = 0; i < intrinsics.size(); i++) {
-    if (func == intrinsics[i])
+    // If the function prefixes match, then we consider it a match.
+    if (func.compare(0, intrinsics[i].size(), intrinsics[i]) == 0) {
       return true;
+    }
   }
   return false;
 }
@@ -455,13 +474,13 @@ bool Tracer::isLLVMIntrinsic(const std::string& func) {
 void Tracer::printParamLine(Instruction *I, InstOperandParams *params) {
   printParamLine(I, params->param_num, params->operand_name, params->bbid,
                  params->datatype, params->datasize, params->value,
-                 params->is_reg, params->prev_bbid);
+                 params->is_reg, params->is_intrinsic, params->prev_bbid);
 }
 
 void Tracer::printParamLine(Instruction *I, int param_num, const char *reg_id,
                             const char *bbId, Type::TypeID datatype,
                             unsigned datasize, Value *value, bool is_reg,
-                            const char *prev_bbid) {
+                            bool is_intrinsic, const char *prev_bbid) {
   IRBuilder<> IRB(I);
   bool is_phi = (bbId != nullptr && strcmp(bbId, "phi") == 0);
   Value *v_param_num = ConstantInt::get(IRB.getInt64Ty(), param_num);
@@ -484,7 +503,11 @@ void Tracer::printParamLine(Instruction *I, int param_num, const char *reg_id,
                         vv_reg_id, v_is_phi, vv_prev_bbid };
       IRB.CreateCall(TL_log_double, args);
     } else if (datatype == llvm::Type::PointerTyID) {
-      Value *v_value = IRB.CreatePtrToInt(value, IRB.getInt64Ty());
+      Value *v_value;
+      if (is_intrinsic)
+        v_value = ConstantInt::get(IRB.getInt64Ty(), 0);
+      else
+        v_value = IRB.CreatePtrToInt(value, IRB.getInt64Ty());
       Value *args[] = { v_param_num,    v_size,   v_value,     v_is_reg,
                         vv_reg_id, v_is_phi, vv_prev_bbid };
       IRB.CreateCall(TL_log_ptr, args);
@@ -760,6 +783,8 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
     opcode = SINE;
   else if (fun->getName() == "cos")
     opcode = COSINE;
+  else if (fun->isIntrinsic())
+    opcode = INTRINSIC;
   else
     opcode = inst->getOpcode();
 
@@ -776,6 +801,7 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
   params.datasize = getMemSize(func_name_op->getType());
   params.value = func_name_op;
   params.is_reg = func_name_op->hasName();
+  params.is_intrinsic = fun->isIntrinsic();
   assert(params.is_reg);
   printParamLine(inst, &params);
 

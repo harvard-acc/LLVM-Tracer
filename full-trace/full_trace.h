@@ -37,12 +37,13 @@ struct InstOperandParams {
   public:
     InstOperandParams()
         : param_num(-1), datatype(Type::VoidTyID), datasize(0), is_reg(true),
-          value(nullptr), operand_name(nullptr), bbid(nullptr),
-          prev_bbid(s_phi) {}
+          is_intrinsic(false), value(nullptr), operand_name(nullptr),
+          bbid(nullptr), prev_bbid(s_phi) {}
 
     InstOperandParams(const InstOperandParams &other)
         : param_num(other.param_num), datatype(other.datatype),
-          datasize(other.datasize), is_reg(other.is_reg), value(other.value),
+          datasize(other.datasize), is_reg(other.is_reg),
+          is_intrinsic(other.is_intrinsic), value(other.value),
           operand_name(other.operand_name), bbid(other.bbid),
           prev_bbid(other.prev_bbid) {}
 
@@ -59,6 +60,8 @@ struct InstOperandParams {
     unsigned datasize;
     // This operand was stored in a register.
     bool is_reg;
+    // True if this instruction is a call to an intrinsic function.
+    bool is_intrinsic;
     // Value of this operand, if it has one. PHI nodes generally do not have values.
     Value* value;
 
@@ -126,7 +129,7 @@ class Tracer : public FunctionPass {
     void printParamLine(Instruction *I, int param_num, const char *reg_id,
                         const char *bbId, Type::TypeID datatype,
                         unsigned datasize, Value *value, bool is_reg,
-                        const char *prev_bbid = s_phi);
+                        bool is_intrinsic, const char *prev_bbid = s_phi);
 
     void printParamLine(Instruction *I, InstOperandParams *params);
 
