@@ -214,6 +214,16 @@ class Tracer : public FunctionPass {
     // just return the Constant*.
     Constant *createStringArgIfNotExists(const char *str);
 
+    // The attributes that define a VectorType are the number of elements, the
+    // size of each element in bytes, and the element type ID.
+    //
+    // Three attributes are required in order to distinguish equally sized
+    // vectors of floating point elements from integral elements.
+    using VecBufKey = std::tuple<unsigned, unsigned, Type::TypeID>;
+
+    // Create a VecBufKey tuple from the given vector type.
+    VecBufKey createVecBufKey(Type *vector_type);
+
     // References to the logging functions.
     Value *TL_log0;
     Value *TL_log_int;
@@ -238,11 +248,11 @@ class Tracer : public FunctionPass {
     // will track all functions called by it (the top-level function).
     bool is_toplevel_mode;
 
-    // Map of stack-allocated vector buffers and their sizes.
+    // Map of stack-allocated vector buffers and their type keys.
     //
-    // Whenever we need a buffer, we look up its size to see if we already have
-    // one allocated, and return a pointer to that buffer if so.
-    std::map<unsigned, AllocaInst*> vector_buffers;
+    // Whenever we need a buffer, we look up its type key to see if we already
+    // have one allocated and return a pointer to that buffer if so.
+    std::map<VecBufKey, AllocaInst*> vector_buffers;
 
     // Map of strings to newly created global variables storing them.
     std::map<std::string, Constant*> global_strings;

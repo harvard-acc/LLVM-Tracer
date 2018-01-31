@@ -282,13 +282,10 @@ bool Tracer::doInitialization(Module &M) {
 bool Tracer::runOnFunction(Function &F) {
   bool func_modified = false;
 
-  if (curr_function != &F) {
-    st->purgeFunction();
-    st->incorporateFunction(&F);
-    curr_function = &F;
-    slotToVarName.clear();
-  }
-
+  curr_function = &F;
+  st->purgeFunction();
+  st->incorporateFunction(&F);
+  slotToVarName.clear();
   // Stack allocated buffers can't be reused across functions of course.
   vector_buffers.clear();
 
@@ -398,9 +395,17 @@ bool Tracer::runOnFunctionEntry(Function& func) {
   // insert instrumentation before an alloca instruction we attempt to reuse.
   for (; insertp != first_bb->end();) {
     if (AllocaInst* alloca = dyn_cast<AllocaInst>(insertp)) {
-      if (alloca->hasName() && alloca->getName().startswith("alloca.vecbuf.")) {
-        ++insertp;
-        continue;
+      Type* allocated_type = alloca->getAllocatedType();
+      if (allocated_type->isVectorTy()) {
+        // There can only be one alloca instruction for a given vector type in
+        // our vector buffer, so see if that one is equal to the current alloca
+        // inst. If so, then don't instrument this instruction.
+        VecBufKey key = createVecBufKey(allocated_type);
+        auto buf_it = vector_buffers.find(key);
+        if (buf_it != vector_buffers.end() && buf_it->second == alloca) {
+          ++insertp;
+          continue;
+        }
       }
     }
     break;
@@ -933,26 +938,32 @@ Constant *Tracer::createStringArgIfNotExists(const char *str) {
   return global_strings[key];
 }
 
+Tracer::VecBufKey Tracer::createVecBufKey(Type* vector_type) {
+  assert(vector_type->isVectorTy());
+  unsigned num_elements = vector_type->getVectorNumElements();
+  unsigned scalar_size = vector_type->getScalarSizeInBits() / 8;
+  Type::TypeID element_type = vector_type->getVectorElementType()->getTypeID();
+  VecBufKey key = std::make_tuple(num_elements, scalar_size, element_type);
+  return key;
+}
+
 Value *Tracer::createVectorArg(Value *vector, IRBuilder<> &IRB) {
   Type* vector_type = vector->getType();
-  assert(vector_type->isVectorTy());
-  unsigned vector_size = vector_type->getScalarSizeInBits() / 8;
+  VecBufKey key = createVecBufKey(vector_type);
   AllocaInst* alloca;
-  if (vector_buffers.find(vector_size) == vector_buffers.end()) {
+  if (vector_buffers.find(key) == vector_buffers.end()) {
     // If we don't find a pre-allocated buffer of this size, we allocate a new
     // one. Critically, we insert the alloca instruction at the very beginning
     // of the function to ensure that it dominates all uses.
     BasicBlock::iterator insertp = curr_function->front().getFirstInsertionPt();
     IRBuilder<> alloca_builder(insertp);
     Value *alloca_size = ConstantInt::get(IRB.getInt64Ty(), 1);
-    std::string id = std::to_string(vector_size);
-    alloca = alloca_builder.CreateAlloca(vector_type, alloca_size,
-                                         "alloca.vecbuf." + id);
-    vector_buffers[vector_size] = alloca;
+    alloca = alloca_builder.CreateAlloca(vector_type, alloca_size);
+    vector_buffers[key] = alloca;
   } else {
-    alloca = vector_buffers.at(vector_size);
+    alloca = vector_buffers.at(key);
   }
-  IRB.CreateAlignedStore(vector, alloca, vector_size);
+  IRB.CreateAlignedStore(vector, alloca, std::get<1>(key));
   Value *bitcast = IRB.CreatePointerCast(alloca, IRB.getInt8PtrTy());
   return bitcast;
 }
