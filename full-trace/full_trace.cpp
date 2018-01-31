@@ -350,7 +350,8 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
         continue;
       }
       const std::string &called_func_name = called_func->getName().str();
-      if (isLLVMIntrinsic(called_func_name)) {
+      if (isLLVMIntrinsic(called_func_name) ||
+          isDmaFunction(called_func_name)) {
         // There are certain intrinsic functions which represent real work the
         // accelerator may want to do, which we want to capture. These include
         // special math operators, memcpy, and target-specific instructions.
@@ -686,7 +687,7 @@ void Tracer::makeValueId(Value *value, char *id_str) {
          "This value does not have a name or a slot number!\n");
 }
 
-bool Tracer::isDmaFunction(std::string& funcName) {
+bool Tracer::isDmaFunction(const std::string& funcName) {
   return (funcName == "dmaLoad" ||
           funcName == "dmaStore" ||
           funcName == "dmaFence" ||

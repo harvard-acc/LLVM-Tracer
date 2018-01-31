@@ -144,7 +144,7 @@ class Tracer : public FunctionPass {
     // Does this function appear in our list of tracked functions?
     bool isTrackedFunction(const std::string& func);
     // Is this function one of the special DMA functions?
-    bool isDmaFunction(std::string& funcName);
+    bool isDmaFunction(const std::string& funcName);
     // Is this function an LLVM intrinsic?
     bool isLLVMIntrinsic(const std::string& func);
 
