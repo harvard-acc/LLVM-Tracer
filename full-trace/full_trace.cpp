@@ -525,7 +525,20 @@ void Tracer::printParamLine(Instruction *I, int param_num, const char *reg_id,
                         vv_reg_id, v_is_phi, vv_prev_bbid };
       IRB.CreateCall(TL_log_vector, args);
     } else {
-      fprintf(stderr, "normal data else: %d, %s\n", datatype, reg_id);
+      errs() << "[WARNING]: Encountered unhandled datatype ";
+      if (datatype <= Type::LastPrimitiveTyID) {
+        Type* t = Type::getPrimitiveType(curr_module->getContext(), datatype);
+        errs() << *t;
+      } else if (datatype == Type::FunctionTyID) {
+        errs() << "FunctionType";
+      } else if (datatype == Type::StructTyID) {
+        errs() << "StructType";
+      } else if (datatype == Type::ArrayTyID) {
+        errs() << "ArrayType";
+      } else {
+        errs() << "UnknownType";
+      }
+      errs() << " on variable " << reg_id << "\n";
     }
   } else {
     Value *v_value = ConstantInt::get(IRB.getInt64Ty(), 0);
