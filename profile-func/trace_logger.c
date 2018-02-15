@@ -146,6 +146,7 @@ void update_logging_status(char *name, int opcode, bool is_tracked_function,
   if (current_logging_status == LOG_AND_STOP) {
     printf("Stopping logging at inst %d.\n", inst_count);
     current_logging_status = DO_NOT_LOG;
+    fflush(stdout);
     return;
   }
 
@@ -154,8 +155,11 @@ void update_logging_status(char *name, int opcode, bool is_tracked_function,
   current_logging_status =
       log_or_not(is_toplevel_mode, is_tracked_function, opcode, name);
 
-  if (temp == DO_NOT_LOG && current_logging_status != temp)
+  if (temp == DO_NOT_LOG && current_logging_status != temp) {
     printf("Starting to log at inst = %d.\n", inst_count);
+    fflush(stdout);
+  }
+
 
   if (strlen(current_toplevel_function) == 0 &&
       current_logging_status == LOG_AND_CONTINUE) {
