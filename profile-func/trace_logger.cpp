@@ -156,7 +156,7 @@ void update_logging_status(char *name, int opcode,
   // LOG_AND_STOP would have been set by the previous instruction (which should
   // be logged), and this is already the next one, so STOP.
   if (trace->current_logging_status == LOG_AND_STOP) {
-    printf("%s: Stopping logging at inst %d.\n", trace->trace_name.c_str(),
+    printf("%s: Stopping logging at inst %ld.\n", trace->trace_name.c_str(),
            trace->inst_count);
     trace->current_logging_status = DO_NOT_LOG;
     fflush(stdout);
@@ -170,7 +170,7 @@ void update_logging_status(char *name, int opcode,
       log_or_not(is_toplevel_mode, is_tracked_function, opcode, name);
 
   if (temp == DO_NOT_LOG && trace->current_logging_status != temp) {
-    printf("%s: Starting to log at inst = %d.\n", trace->trace_name.c_str(),
+    printf("%s: Starting to log at inst = %ld.\n", trace->trace_name.c_str(),
            trace->inst_count);
     fflush(stdout);
   }
@@ -213,7 +213,7 @@ void trace_logger_log0(int line_number, char *name, char *bbid, char *instid,
   if (do_not_log())
     return;
 
-  gzprintf(trace->trace_file, "\n0,%d,%s,%s,%s,%d,%d\n", line_number, name,
+  gzprintf(trace->trace_file, "\n0,%d,%s,%s,%s,%d,%ld\n", line_number, name,
            bbid, instid, opcode, trace->inst_count);
   trace->inst_count++;
 }

@@ -25,7 +25,7 @@ enum logging_status {
 struct trace_info {
   std::string trace_name;
   gzFile trace_file;
-  int inst_count;
+  int64_t inst_count;
   std::string current_toplevel_function;
   logging_status current_logging_status;
 
