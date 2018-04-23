@@ -62,13 +62,14 @@ cl::opt<bool>
 
 namespace {
 
-  void split(const std::string &s, const char delim, std::set<std::string> &elems) {
-      std::istringstream ss(s);
-      std::string item;
-      while (std::getline(ss, item, delim)) {
-          elems.insert(item);
-      }
+void split(const std::string &s, const char delim,
+           std::set<std::string> &elems) {
+  std::istringstream ss(s);
+  std::string item;
+  while (std::getline(ss, item, delim)) {
+    elems.insert(item);
   }
+}
 
 // This list comprises the set of intrinsic functions we want to have appear in
 // the dynamic trace. If we see an intrinsic function, we'll compare its prefix
@@ -111,7 +112,7 @@ std::vector<std::string> intrinsics = {
   "llvm.x86.",  // x86 intrinsics
 };
 
-}// end of anonymous namespace
+}  // end of anonymous namespace
 
 static Constant *createStringArg(const char *string, Module *curr_module) {
     Constant *v_string =
@@ -188,13 +189,10 @@ int getMemSize(Type *T) {
 Tracer::Tracer() : FunctionPass(ID) {}
 
 bool Tracer::doInitialization(Module &M) {
-  std::string func_string;
-  if (this->my_workload.empty()) {
-    char* workload = getenv("WORKLOAD");
-    if (workload)
-        func_string = workload;
-  } else {
-    func_string = this->my_workload;
+  std::set<std::string> user_workloads = getUserWorkloadFunctions();
+  if (user_workloads.empty()) {
+    errs() << "\n\nPlease set WORKLOAD as an environment variable!\n\n\n";
+    return false;
   }
 
   auto &llvm_context = M.getContext();
@@ -223,12 +221,6 @@ bool Tracer::doInitialization(Module &M) {
   TL_log_vector = M.getOrInsertFunction( "trace_logger_log_vector", VoidTy,
       I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy, I64Ty, I8PtrTy, nullptr);
 
-  if (func_string.empty()) {
-    errs() << "\n\nPlease set WORKLOAD as an environment variable!\n\n\n";
-    return false;
-  }
-  std::set<std::string> user_workloads;
-  split(func_string, ',', user_workloads);
 
   // We will instrument in top level mode if there is only one workload
   // function or if explicitly told to do so.
@@ -277,6 +269,16 @@ bool Tracer::doInitialization(Module &M) {
   }
 
   return false;
+}
+
+std::set<std::string> Tracer::getUserWorkloadFunctions() const {
+  std::set<std::string> user_workloads;
+  char* workload = getenv("WORKLOAD");
+  if (workload) {
+      std::string func_string = workload;
+      split(func_string, ',', user_workloads);
+  }
+  return user_workloads;
 }
 
 bool Tracer::runOnFunction(Function &F) {

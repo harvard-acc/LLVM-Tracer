@@ -76,14 +76,6 @@ class Tracer : public FunctionPass {
     virtual ~Tracer() {}
     static char ID;
 
-    // This BasicBlockPass may be called by other program.
-    // provide a way to set up workload, not just environment variable
-    std::string my_workload;
-
-    void setWorkload(std::string workload) {
-        this->my_workload = workload;
-    };
-
     virtual bool doInitialization(Module &M);
     virtual bool runOnFunction(Function& F);
     virtual bool runOnBasicBlock(BasicBlock &BB);
@@ -96,6 +88,11 @@ class Tracer : public FunctionPass {
     void handleNonPhiNonCallInstruction(Instruction *inst, InstEnv *env);
     void handleInstructionResult(Instruction *inst, Instruction *next_inst,
                                  InstEnv *env);
+
+    // Return the set of functions in the WORKLOAD environment variable.
+    //
+    // If the environment variable is not set, this returns an empty set.
+    std::set<std::string> getUserWorkloadFunctions() const;
 
     // Instrument function arguments for print-out upon entry.
     //
