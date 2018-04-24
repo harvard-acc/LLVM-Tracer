@@ -233,37 +233,40 @@ bool Tracer::doInitialization(Module &M) {
   curr_module = &M;
   curr_function = nullptr;
 
-  DebugInfoFinder Finder;
-  Finder.processModule(M);
+  debugInfoFinder.processModule(M);
 
   #if (LLVM_VERSION == 34)
-    auto it = Finder.subprogram_begin();
-    auto eit = Finder.subprogram_end();
+    auto it = debugInfoFinder.subprogram_begin();
+    auto eit = debugInfoFinder.subprogram_end();
   #elif (LLVM_VERSION == 35)
-    auto it = Finder.subprograms().begin();
-    auto eit = Finder.subprograms().end();
+    auto it = debugInfoFinder.subprograms().begin();
+    auto eit = debugInfoFinder.subprograms().end();
   #endif
 
   for (auto i = it; i != eit; ++i) {
     DISubprogram S(*i);
 
-    auto MangledName = S.getLinkageName().str();
-    auto Name = S.getName().str();
-
-    assert(Name.size() || MangledName.size());
+    StringRef mangledName = S.getLinkageName();
+    StringRef name = S.getName();
+    assert(name.size() || mangledName.size());
+    if (!mangledName.empty()) {
+      mangledNameMap[mangledName] = name;
+    } else {
+      mangledNameMap[name] = name;
+    }
 
     // Checks out whether Name or Mangled Name matches.
-    auto MangledIt = user_workloads.find(MangledName);
+    auto MangledIt = user_workloads.find(mangledName);
     bool isMangledMatch = MangledIt != user_workloads.end();
 
-    auto PreMangledIt = user_workloads.find(Name);
+    auto PreMangledIt = user_workloads.find(name);
     bool isPreMangledMatch = PreMangledIt != user_workloads.end();
 
     if (isMangledMatch | isPreMangledMatch) {
-      if (MangledName.empty()) {
-        this->tracked_functions.insert(Name);
+      if (mangledName.empty()) {
+        this->tracked_functions.insert(name);
       } else {
-        this->tracked_functions.insert(MangledName);
+        this->tracked_functions.insert(mangledName);
       }
     }
   }
@@ -282,8 +285,15 @@ std::set<std::string> Tracer::getUserWorkloadFunctions() const {
 }
 
 bool Tracer::runOnFunction(Function &F) {
-  bool func_modified = false;
+  // The tracer only supports C code, not C++, so if there is a mangled name
+  // that differs from the canonical name, then it must be a C++ function that
+  // should be skipped.
+  StringRef mangledName = F.getName();
+  StringRef unmangledName = mangledNameMap.at(mangledName);
+  if (mangledName != unmangledName)
+    return false;
 
+  bool func_modified = false;
   curr_function = &F;
   st->purgeFunction();
   st->incorporateFunction(&F);
@@ -462,7 +472,7 @@ bool Tracer::traceOrNot(const std::string& func) {
 
 bool Tracer::isTrackedFunction(const std::string& func) {
   // perform search in log(n) time.
-  std::set<std::string>::iterator it = this->tracked_functions.find(func);
+  std::set<StringRef>::iterator it = this->tracked_functions.find(func);
   if (it != this->tracked_functions.end()) {
       return true;
   }

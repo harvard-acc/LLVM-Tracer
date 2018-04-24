@@ -239,11 +239,17 @@ class Tracer : public FunctionPass {
     SlotTracker *st;
 
     // All functions we are tracking.
-    std::set<std::string> tracked_functions;
+    std::set<StringRef> tracked_functions;
 
     // True if WORKLOAD specifies a single function, in which case the tracer
     // will track all functions called by it (the top-level function).
     bool is_toplevel_mode;
+
+    // Contains debug info for the entire module.
+    DebugInfoFinder debugInfoFinder;
+
+    // Maps linkage (mangled) name to ordinary name.
+    std::map<StringRef, StringRef> mangledNameMap;
 
     // Map of stack-allocated vector buffers and their type keys.
     //

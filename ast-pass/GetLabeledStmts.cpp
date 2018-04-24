@@ -17,6 +17,7 @@
 
 #include <cstdio>
 #include <fstream>
+#include <iostream>
 #include <map>
 #include <stack>
 #include <sys/stat.h>
@@ -169,7 +170,10 @@ class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
   }
 
   // For each function, recursively find every child label statement.
-  virtual bool VisitFunctionDecl(const FunctionDecl* func) const {
+  bool VisitFunctionDecl(const FunctionDecl *func) const {
+    if (func->getLanguageLinkage() != clang::CLanguageLinkage)
+      return true;
+
     if (func->hasBody()) {
       const std::string& funcName = func->getName().str();
       if (labelMap.find(funcName) == labelMap.end())
