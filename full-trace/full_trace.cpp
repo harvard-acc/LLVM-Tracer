@@ -997,23 +997,22 @@ bool LabelMapHandler::runOnModule(Module &M) {
         return false;
 
     IRBuilder<> builder(main->front().getFirstInsertionPt());
+    Function *traceLoggerInit = cast<Function>(M.getOrInsertFunction(
+        "trace_logger_init", builder.getVoidTy(), nullptr));
+    builder.CreateCall(traceLoggerInit);
     bool contains_labelmap = readLabelMap();
-    if (!contains_labelmap) {
-      Function *traceLoggerInit = cast<Function>(M.getOrInsertFunction(
-          "trace_logger_init", builder.getVoidTy(), nullptr));
-      builder.CreateCall(traceLoggerInit);
-    } else {
+    if (contains_labelmap) {
       if (verbose)
         errs() << "Contents of labelmap:\n" << labelmap_str << "\n";
 
-      Function *labelMapWriter = cast<Function>(M.getOrInsertFunction(
-          "trace_logger_write_labelmap", builder.getVoidTy(),
+      Function *labelMapRegister = cast<Function>(M.getOrInsertFunction(
+          "trace_logger_register_labelmap", builder.getVoidTy(),
           builder.getInt8PtrTy(), builder.getInt64Ty(), nullptr));
       Value *v_size =
           ConstantInt::get(builder.getInt64Ty(), labelmap_str.length());
       Constant *v_buf = createStringArg(labelmap_str.c_str(), &M);
-      Value *args[] = {v_buf, v_size};
-      builder.CreateCall(labelMapWriter, args);
+      Value *args[] = { v_buf, v_size };
+      builder.CreateCall(labelMapRegister, args);
     }
 
     return true;
