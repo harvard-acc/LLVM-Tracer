@@ -289,8 +289,8 @@ bool Tracer::runOnFunction(Function &F) {
   // that differs from the canonical name, then it must be a C++ function that
   // should be skipped.
   StringRef mangledName = F.getName();
-  StringRef unmangledName = mangledNameMap.at(mangledName);
-  if (mangledName != unmangledName)
+  auto it = mangledNameMap.find(mangledName);
+  if (it == mangledNameMap.end() || it->second != mangledName)
     return false;
 
   bool func_modified = false;
@@ -342,6 +342,14 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
   for (BasicBlock::iterator itr = insertp; itr != BB.end(); itr = nextitr) {
     nextitr = itr;
     nextitr++;
+
+    // Invoke instructions are used to call functions that may throw exceptions.
+    // They are the only the terminator instruction that can also return a
+    // value. LLVM-Tracer only supports instrumentation of C code (although that
+    // code can live in a C++ file). This kind of behavior is thus unsupported
+    // and does not need any instrumentation.
+    if (isa<InvokeInst>(*itr))
+      continue;
 
     // Get static BasicBlock ID: produce bbid
     makeValueId(&BB, env.bbid);
@@ -948,7 +956,9 @@ void Tracer::handleInstructionResult(Instruction *inst, Instruction *next_inst,
   if (inst->getType()->isVectorTy()) {
     params.value = inst;
   } else if (inst->isTerminator()) {
-    assert(false && "Return instruction is terminator...\n");
+    errs() << "Encountered an unexpected terminator instruction!\n"
+           << *inst << "\n";
+    assert(false);
   } else {
     params.value = inst;
   }
