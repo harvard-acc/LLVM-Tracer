@@ -1,4 +1,4 @@
-LLVM IR Trace Profiler (LLVM-Tracer) 1.2
+LLVM IR Trace Profiler (LLVM-Tracer) 2.0
 ========================================
 LLVM-Tracer is an LLVM instrumentation pass to print out a dynamic LLVM IR
 trace, including dynamic register values and memory addresses.
@@ -14,12 +14,23 @@ International Symposium on Performance Analysis of Systems and Software
 
 Requirements:
 -------------------
-  1. LLVM 3.4 and Clang 3.4 64-bit or LLVM 3.5 and Clang 3.5 64-bit
-  2. GCC 4.7 or newer for C++11 features.
+  1. LLVM 6.0 and Clang 6.0 64-bit. It is highly recommended that users
+     download the packages prebuilt by LLVM and install with the system's
+     package manager (apt/yum/etc), rather than building the toolchain from
+     source.
+  2. GCC 5.4 or later.
   3. CMake 2.8.12 or newer.
 
 Build:
 -----------------
+**Breaking changes from v1.2 to v2.0:**
+
+  * LLVM-Tracer now uses LLVM 6.0. Support for all previous versions of LLVM
+    have been removed. Minor versions 6.0.0 and 6.0.1 have been tested to work.
+  * C++ is now supported in un-instrumented modes. That is, you can write C++
+    to build your applications and only have LLVM-Tracer instrument and generate
+    dynamic traces for the parts that only use C features.
+
 **Breaking changes from v1.1 to v1.2:**
 
   * CMake is no longer optional. LLVM-Tracer only supports CMake for building.
@@ -31,7 +42,7 @@ Build:
 
   CMake is a configure tool which allows you to do out-of-source build.
   LLVM-Tracer requires CMake newer than 2.8.12. By default, CMake
-  searches for LLVM 3.4.
+  searches for LLVM 6.0.
 
   1. Set `LLVM_HOME` to where you installed LLVM
      ```
@@ -77,10 +88,6 @@ Build:
        this option is not defined, environment variable LLVM_HOME will be
        used.
 
-     -DLLVM_RECOMMEND_VERSION="3.4", "3.5"    (default : 3.4)
-       LLVM-Tracer supports both LLVM 3.4 and 3.5. It uses LLVM 3.4 by
-       default, but you can manually specify the LLVM version to use.
-
      -DAUTOINSTALL=TRUE,FALSE    (default : FALSE)
        By this option, CMake scripts will automatically download, build and
        install LLVM for you if finds no LLVM installation. Using this
@@ -89,11 +96,6 @@ Build:
        The default installation path is under /your/build_dir/lib/llvm-3.x.
        You can manually define the installation path by
        -DLLVM_ROOT=/where/to/install.
-
-       The default installation version will be 3.4. You can define
-       the installation version by -DLLVM_RECOMMEND_VERSION="3.5" or "3.4".
-       This auto install script will try to use the latest patch version
-       according to cmake-scripts/AutoInstall/LLVMPatchVersion.cmake
 
      -DCMAKE_BUILD_TYPE=None,Debug,Release    (default : None)
        You can choose one from three of bulid types.
@@ -135,7 +137,7 @@ Example program: triad
 
         ```
         export TRACER_HOME=/your/path/to/LLVM-Tracer
-        ${TRACER_HOME}/bin/get-labeled-stmts triad.c -- -I${LLVM_HOME}/lib/clang/3.4/include
+        ${TRACER_HOME}/bin/get-labeled-stmts triad.c -- -I${LLVM_HOME}/lib/clang/6.0/include
         ```
 
      c. Generate LLVM IR:
