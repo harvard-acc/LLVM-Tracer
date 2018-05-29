@@ -1,15 +1,6 @@
 #include <vector>
 #include <map>
 #include <cmath>
-#include "llvm/Analysis/LoopInfo.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Instruction.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Metadata.h"
-#include "llvm/IR/Type.h"
-#include "llvm/Support/CommandLine.h"
 #include <cstring>
 #include <cstdlib>
 #include <cstdio>
@@ -18,14 +9,19 @@
 #include <set>
 #include <sstream>
 #include <sys/stat.h>
-#include "SlotTracker.h"
-#include "full_trace.h"
 
-#if (LLVM_VERSION == 34)
-  #include "llvm/DebugInfo.h"
-#elif (LLVM_VERSION == 35)
-  #include "llvm/IR/DebugInfo.h"
-#endif
+#include "llvm/Analysis/LoopInfo.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Instruction.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Metadata.h"
+#include "llvm/IR/Type.h"
+#include "llvm/Support/CommandLine.h"
+
+#include "full_trace.h"
 
 #define RESULT_LINE 19134
 #define FORWARD_LINE 24601
@@ -127,7 +123,7 @@ static Constant *createStringArg(const char *string, Module *curr_module) {
                                          APInt(32, StringRef("0"), 10));
     indices.push_back(zero);
     indices.push_back(zero);
-    return ConstantExpr::getGetElementPtr(gvar_array, indices);
+    return ConstantExpr::getGetElementPtr(ArrayTy_0, gvar_array, indices);
 }
 
 int getMemSize(Type *T) {
@@ -204,22 +200,22 @@ bool Tracer::doInitialization(Module &M) {
 
   // Add external trace_logger function declarations.
   TL_log_entry = M.getOrInsertFunction("trace_logger_log_entry", VoidTy,
-                                       I8PtrTy, I64Ty, nullptr);
+                                       I8PtrTy, I64Ty);
 
   TL_log0 = M.getOrInsertFunction( "trace_logger_log0", VoidTy,
-      I64Ty, I8PtrTy, I8PtrTy, I8PtrTy, I64Ty, I1Ty, I1Ty, nullptr);
+      I64Ty, I8PtrTy, I8PtrTy, I8PtrTy, I64Ty, I1Ty, I1Ty);
 
   TL_log_int = M.getOrInsertFunction( "trace_logger_log_int", VoidTy,
-      I64Ty, I64Ty, I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy, nullptr);
+      I64Ty, I64Ty, I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy);
 
   TL_log_ptr = M.getOrInsertFunction( "trace_logger_log_ptr", VoidTy,
-      I64Ty, I64Ty, I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy, nullptr);
+      I64Ty, I64Ty, I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy);
 
   TL_log_double = M.getOrInsertFunction( "trace_logger_log_double", VoidTy,
-      I64Ty, I64Ty, DoubleTy, I64Ty, I8PtrTy, I64Ty, I8PtrTy, nullptr);
+      I64Ty, I64Ty, DoubleTy, I64Ty, I8PtrTy, I64Ty, I8PtrTy);
 
   TL_log_vector = M.getOrInsertFunction( "trace_logger_log_vector", VoidTy,
-      I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy, I64Ty, I8PtrTy, nullptr);
+      I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy, I64Ty, I8PtrTy);
 
 
   // We will instrument in top level mode if there is only one workload
@@ -228,26 +224,18 @@ bool Tracer::doInitialization(Module &M) {
   if (is_toplevel_mode && verbose)
     std::cout << "LLVM-Tracer is instrumenting this workload in top-level mode.\n";
 
-  st = createSlotTracker(&M);
-  st->initialize();
   curr_module = &M;
   curr_function = nullptr;
-
   debugInfoFinder.processModule(M);
 
-  #if (LLVM_VERSION == 34)
-    auto it = debugInfoFinder.subprogram_begin();
-    auto eit = debugInfoFinder.subprogram_end();
-  #elif (LLVM_VERSION == 35)
-    auto it = debugInfoFinder.subprograms().begin();
-    auto eit = debugInfoFinder.subprograms().end();
-  #endif
+  auto it = debugInfoFinder.subprograms().begin();
+  auto eit = debugInfoFinder.subprograms().end();
 
   for (auto i = it; i != eit; ++i) {
-    DISubprogram S(*i);
+    DISubprogram* const S = (*i);
+    StringRef mangledName = S->getLinkageName();
+    StringRef name = S->getName();
 
-    StringRef mangledName = S.getLinkageName();
-    StringRef name = S.getName();
     assert(name.size() || mangledName.size());
     if (!mangledName.empty()) {
       mangledNameMap[mangledName] = name;
@@ -295,8 +283,8 @@ bool Tracer::runOnFunction(Function &F) {
 
   bool func_modified = false;
   curr_function = &F;
-  st->purgeFunction();
-  st->incorporateFunction(&F);
+  st = new ModuleSlotTracker(curr_module);
+  st->incorporateFunction(F);
   slotToVarName.clear();
   // Stack allocated buffers can't be reused across functions of course.
   vector_buffers.clear();
@@ -307,6 +295,7 @@ bool Tracer::runOnFunction(Function &F) {
   }
   if (F.getName() != "main")
     func_modified |= runOnFunctionEntry(F);
+  delete st;
   return func_modified;
 }
 
@@ -354,11 +343,12 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
     // Get static BasicBlock ID: produce bbid
     makeValueId(&BB, env.bbid);
     // Get static instruction ID: produce instid
-    getInstId(itr, &env);
-    setLineNumberIfExists(itr, &env);
+    Instruction* currInst = cast<Instruction>(itr);
+    getInstId(currInst, &env);
+    setLineNumberIfExists(currInst, &env);
 
     bool traceCall = true;
-    if (CallInst *I = dyn_cast<CallInst>(itr)) {
+    if (CallInst *I = dyn_cast<CallInst>(currInst)) {
       Function *called_func = I->getCalledFunction();
       // This is an indirect function  invocation (i.e. through called_fun
       // pointer). This cannot happen for code that we want to turn into
@@ -385,17 +375,18 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
     if (!traceCall)
       continue;
 
-    if (isa<CallInst>(itr) && traceCall) {
-      handleCallInstruction(itr, &env);
+    if (isa<CallInst>(currInst) && traceCall) {
+      handleCallInstruction(currInst, &env);
     } else {
-      handleNonPhiNonCallInstruction(itr, &env);
+      handleNonPhiNonCallInstruction(currInst, &env);
     }
 
-    if (!itr->getType()->isVoidTy()) {
-      handleInstructionResult(itr, nextitr, &env);
+    if (!currInst->getType()->isVoidTy()) {
+      Instruction* nextInst = cast<Instruction>(nextitr);
+      handleInstructionResult(currInst, nextInst, &env);
     }
 
-    if (isa<AllocaInst>(itr)) {
+    if (isa<AllocaInst>(currInst)) {
       processAllocaInstruction(itr);
     }
   }
@@ -407,7 +398,7 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
 bool Tracer::runOnFunctionEntry(Function& func) {
   // We have to get the first insertion point before we insert any
   // instrumentation!
-  BasicBlock* first_bb = func.begin();
+  BasicBlock* first_bb = cast<BasicBlock>(func.begin());
   BasicBlock::iterator insertp = first_bb->getFirstInsertionPt();
 
   // Fast forward past any vector buffer alloca instructions we find at the
@@ -431,19 +422,18 @@ bool Tracer::runOnFunctionEntry(Function& func) {
     break;
   }
 
-  Function::ArgumentListType &args(func.getArgumentList());
   std::string funcName = func.getName().str();
   bool is_entry_block = isTrackedFunction(funcName) && is_toplevel_mode;
   if (is_entry_block) {
     InstEnv env;
     strncpy(env.funcName, funcName.c_str(), InstEnv::BUF_SIZE);
-    printTopLevelEntryFirstLine(insertp, &env, args.size());
+    printTopLevelEntryFirstLine(cast<Instruction>(insertp), &env,
+                                func.arg_size());
   }
 
   int call_id = 1;
-  for (Function::ArgumentListType::iterator arg_it = args.begin(),
-                                            arg_end = args.end();
-       arg_it != arg_end; ++arg_it, ++call_id) {
+  for (auto arg_it = func.arg_begin(); arg_it != func.arg_end();
+       ++arg_it, ++call_id) {
     char arg_name_buf[256];
     InstOperandParams params;
     params.param_num = is_entry_block ? call_id : FORWARD_LINE;
@@ -466,7 +456,7 @@ bool Tracer::runOnFunctionEntry(Function& func) {
       params.value = arg_it;
     }
 
-    printParamLine(insertp, &params);
+    printParamLine(cast<Instruction>(insertp), &params);
   }
 
   return true;
@@ -546,17 +536,17 @@ void Tracer::printParamLine(Instruction *I, int param_num, const char *reg_id,
       IRB.CreateCall(TL_log_vector, args);
     } else {
       errs() << "[WARNING]: Encountered unhandled datatype ";
-      if (datatype <= Type::LastPrimitiveTyID) {
-        Type* t = Type::getPrimitiveType(curr_module->getContext(), datatype);
-        errs() << *t;
-      } else if (datatype == Type::FunctionTyID) {
+      if (datatype == Type::FunctionTyID) {
         errs() << "FunctionType";
       } else if (datatype == Type::StructTyID) {
         errs() << "StructType";
       } else if (datatype == Type::ArrayTyID) {
         errs() << "ArrayType";
+      } else if (datatype == Type::TokenTyID) {
+        errs() << "ArrayType";
       } else {
-        errs() << "UnknownType";
+        Type* t = Type::getPrimitiveType(curr_module->getContext(), datatype);
+        errs() << *t;
       }
       errs() << " on variable " << reg_id << "\n";
     }
@@ -675,7 +665,7 @@ void Tracer::processAllocaInstruction(BasicBlock::iterator it) {
     // The debug declare call is not guaranteed to come right after the alloca.
     while (!found_debug_declare && !it->isTerminator()) {
       it++;
-      Instruction *I = it;
+      Instruction *I = cast<Instruction>(it);
       DbgDeclareInst *di = dyn_cast<DbgDeclareInst>(I);
       if (di) {
         Value *wrapping_arg = di->getAddress();
@@ -689,9 +679,7 @@ void Tracer::processAllocaInstruction(BasicBlock::iterator it) {
         if (id != alloca_id)
           continue;
 
-        MDNode *md = di->getVariable();
-        // The name of the variable is the third operand of the metadata node.
-        Value *name_operand = md->getOperand(2);
+        DILocalVariable* name_operand = di->getVariable();
         std::string name = name_operand->getName().str();
         slotToVarName[id] = name;
         found_debug_declare = true;
@@ -704,7 +692,7 @@ void Tracer::makeValueId(Value *value, char *id_str) {
   int id = st->getLocalSlot(value);
   bool hasName = value->hasName();
   if (BasicBlock* BB = dyn_cast<BasicBlock>(value)) {
-    LoopInfo &info = getAnalysis<LoopInfo>();
+    LoopInfo &info = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
     unsigned loop_depth = info.getLoopDepth(BB);
     // 10^3 - 1 is the maximum loop depth.
     const unsigned kMaxLoopDepthChars = 3;
@@ -734,21 +722,25 @@ bool Tracer::isDmaFunction(const std::string& funcName) {
 
 void Tracer::setLineNumberIfExists(Instruction *I, InstEnv *env) {
   if (MDNode *N = I->getMetadata("dbg")) {
-    DILocation Loc(N); // DILocation is in DebugInfo.h
-    env->line_number = Loc.getLineNumber();
-  } else {
-    env->line_number = -1;
+    DILocation* loc = dyn_cast<DILocation>(N);
+    if (loc) {
+      env->line_number = loc->getLine();
+      return;
+    }
   }
+  env->line_number = -1;
 }
 
 // Handle all phi nodes at the beginning of a basic block.
 void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
   BasicBlock::iterator insertp = BB->getFirstInsertionPt();
+  Instruction* insertPointInst = cast<Instruction>(insertp);
 
   char prev_bbid[InstEnv::BUF_SIZE];
   char operR[InstEnv::BUF_SIZE];
 
   for (BasicBlock::iterator itr = BB->begin(); isa<PHINode>(itr); itr++) {
+    Instruction* currInst = cast<Instruction>(itr);
     InstOperandParams params;
     params.prev_bbid = prev_bbid;
     params.operand_name = operR;
@@ -757,19 +749,19 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
     Value *curr_operand = nullptr;
 
     makeValueId(BB, env->bbid);
-    getInstId(itr, env);
-    setLineNumberIfExists(itr, env);
+    getInstId(currInst, env);
+    setLineNumberIfExists(currInst, env);
 
-    printFirstLine(insertp, env, itr->getOpcode());
+    printFirstLine(insertPointInst, env, currInst->getOpcode());
 
     // Print each operand.
-    int num_of_operands = itr->getNumOperands();
+    int num_of_operands = currInst->getNumOperands();
     if (num_of_operands > 0) {
       for (int i = num_of_operands - 1; i >= 0; i--) {
         BasicBlock *prev_bblock =
-            (dyn_cast<PHINode>(itr))->getIncomingBlock(i);
+            (dyn_cast<PHINode>(currInst))->getIncomingBlock(i);
         makeValueId(prev_bblock, params.prev_bbid);
-        curr_operand = itr->getOperand(i);
+        curr_operand = currInst->getOperand(i);
         params.param_num = i + 1;
         params.setDataTypeAndSize(curr_operand);
 
@@ -781,24 +773,24 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
           strcpy(params.operand_name, curr_operand->getName().str().c_str());
           params.value = curr_operand;
         }
-        printParamLine(insertp, &params);
+        printParamLine(insertPointInst, &params);
       }
     }
 
     // Print result line.
-    if (!itr->getType()->isVoidTy()) {
+    if (!currInst->getType()->isVoidTy()) {
       params.is_reg = true;
       params.param_num = RESULT_LINE;
       params.operand_name = env->instid;
       params.bbid = nullptr;
-      params.datatype = itr->getType()->getTypeID();
-      params.datasize = getMemSize(itr->getType());
-      if (itr->isTerminator()) {
+      params.datatype = currInst->getType()->getTypeID();
+      params.datasize = getMemSize(currInst->getType());
+      if (currInst->isTerminator()) {
         assert(false && "It is terminator...\n");
       } else {
-        params.value = itr;
+        params.value = currInst;
       }
-      printParamLine(insertp, &params);
+      printParamLine(insertPointInst, &params);
     }
   }
 }
@@ -845,10 +837,8 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
   printParamLine(inst, &params);
 
   int call_id = 0;
-  const Function::ArgumentListType &Args(fun->getArgumentList());
-  for (Function::ArgumentListType::const_iterator arg_it = Args.begin(),
-                                                  arg_end = Args.end();
-       arg_it != arg_end; ++arg_it, ++call_id) {
+  for (auto arg_it = fun->arg_begin(); arg_it != fun->arg_end();
+       ++arg_it, ++call_id) {
     Value* curr_operand = inst->getOperand(call_id);
 
     // Every argument in the function call will have two lines printed,
@@ -990,7 +980,8 @@ Value *Tracer::createVectorArg(Value *vector, IRBuilder<> &IRB) {
     // If we don't find a pre-allocated buffer of this size, we allocate a new
     // one. Critically, we insert the alloca instruction at the very beginning
     // of the function to ensure that it dominates all uses.
-    BasicBlock::iterator insertp = curr_function->front().getFirstInsertionPt();
+    Instruction *insertp =
+        cast<Instruction>(curr_function->front().getFirstInsertionPt());
     IRBuilder<> alloca_builder(insertp);
     Value *alloca_size = ConstantInt::get(IRB.getInt64Ty(), 1);
     alloca = alloca_builder.CreateAlloca(vector_type, alloca_size);
@@ -1004,7 +995,7 @@ Value *Tracer::createVectorArg(Value *vector, IRBuilder<> &IRB) {
 }
 
 void Tracer::getAnalysisUsage(AnalysisUsage& Info) const {
-  Info.addRequired<LoopInfo>();
+  Info.addRequired<LoopInfoWrapperPass>();
   Info.setPreservesAll();
 }
 
@@ -1018,9 +1009,9 @@ bool LabelMapHandler::runOnModule(Module &M) {
     if (!main)
         return false;
 
-    IRBuilder<> builder(main->front().getFirstInsertionPt());
-    Function *traceLoggerInit = cast<Function>(M.getOrInsertFunction(
-        "trace_logger_init", builder.getVoidTy(), nullptr));
+    IRBuilder<> builder(cast<Instruction>(main->front().getFirstInsertionPt()));
+    Function *traceLoggerInit = cast<Function>(
+        M.getOrInsertFunction("trace_logger_init", builder.getVoidTy()));
     builder.CreateCall(traceLoggerInit);
     bool contains_labelmap = readLabelMap();
     if (contains_labelmap) {
@@ -1029,7 +1020,7 @@ bool LabelMapHandler::runOnModule(Module &M) {
 
       Function *labelMapRegister = cast<Function>(M.getOrInsertFunction(
           "trace_logger_register_labelmap", builder.getVoidTy(),
-          builder.getInt8PtrTy(), builder.getInt64Ty(), nullptr));
+          builder.getInt8PtrTy(), builder.getInt64Ty()));
       Value *v_size =
           ConstantInt::get(builder.getInt64Ty(), labelmap_str.length());
       Constant *v_buf = createStringArg(labelmap_str.c_str(), &M);

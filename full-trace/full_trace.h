@@ -5,8 +5,12 @@
 #include "llvm/Pass.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/ModuleSlotTracker.h"
 
 extern char s_phi[];
+
+using namespace llvm;
 
 // Get the bitwidth of this type.
 int getMemSize(Type *T);
@@ -236,7 +240,7 @@ class Tracer : public FunctionPass {
     Function *curr_function;
 
     // Local slot tracker for the current function.
-    SlotTracker *st;
+    ModuleSlotTracker *st;
 
     // All functions we are tracking.
     std::set<StringRef> tracked_functions;

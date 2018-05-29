@@ -205,9 +205,10 @@ class LabeledStmtASTConsumer : public ASTConsumer {
 
 class LabeledStmtFrontendAction : public ASTFrontendAction {
  public:
-  virtual ASTConsumer* CreateASTConsumer(CompilerInstance& CI, StringRef file) {
-    return new LabeledStmtASTConsumer(&CI);
-  }
+   virtual std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
+                                                          StringRef file) {
+     return std::unique_ptr<ASTConsumer>(new LabeledStmtASTConsumer(&CI));
+   }
 
   // Write a label to line number mapping to the labelmap file.
   //
@@ -300,19 +301,10 @@ static void cleanup() {
 }
 
 int main(int argc, const char** argv) {
-#if (LLVM_VERSION == 34)
-  CommonOptionsParser op(argc, argv);
-#elif (LLVM_VERSION == 35)
   CommonOptionsParser op(argc, argv, GetLabelStmtsCat);
-#endif
-
   ClangTool Tool(op.getCompilations(), op.getSourcePathList());
   cleanup();
 
-  // In llvm 3.4, newFrontendActionFactory returns raw pointers.
-  // In llvm 3.5, it returns unique_ptr<>
-  // Use unique_ptr to keep pointers, therefore being compatible with
-  // LLVM 3.4/3.5
   std::unique_ptr<FrontendActionFactory>
         actionfactory(newFrontendActionFactory<LabeledStmtFrontendAction>());
   int result = Tool.run(actionfactory.get());
