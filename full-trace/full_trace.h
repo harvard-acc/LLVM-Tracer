@@ -215,6 +215,30 @@ class Tracer : public FunctionPass {
     // just return the Constant*.
     Constant *createStringArgIfNotExists(const char *str);
 
+    // Collect debug information in the current function.
+    //
+    // Release builds of LLVM 6 discards value names when emitting LLVM IR. This
+    // behavior cannot be overriden from the driver, only directly via cc1,
+    // which is not practical. However, this information is still available via
+    // the embedded debug info, so we can fallback on this if value names are
+    // not present.
+    //
+    // This must be done before runOnFunction() is called.
+    void collectDebugInfo(DbgInfoIntrinsic *debug);
+
+    // Purge the debug info cache for this function.
+    void purgeDebugInfo();
+
+    // Value name lookup wrapper function.
+    //
+    // If value->hasName() returns false, this looks up the value's name in the
+    // debug info cache. This returns a pair of bool and StringRef, where where
+    // the bool indicates whether a name was found or not. The StringRef is the
+    // result of the lookup and is always valid; when a name are not found, it
+    // will be empty.
+    using ValueNameLookup = std::pair<bool, StringRef>;
+    ValueNameLookup getValueName(Value *value);
+
     // The attributes that define a VectorType are the number of elements, the
     // size of each element in bytes, and the element type ID.
     //
@@ -272,6 +296,9 @@ class Tracer : public FunctionPass {
     // Since slot numbers are reused across functions, this has to be cleared
     // when we switch to a new function.
     std::map<unsigned, std::string> slotToVarName;
+
+    // Debug info cache of value names.
+    std::map<Value*, StringRef> valueDebugName;
 };
 
 /* Reads a labelmap file and inserts it into the dynamic trace.

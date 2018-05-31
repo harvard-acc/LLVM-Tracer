@@ -289,12 +289,25 @@ bool Tracer::runOnFunction(Function &F) {
   // Stack allocated buffers can't be reused across functions of course.
   vector_buffers.clear();
 
+  // Collect debug info before adding any instrumentation.
+  //
+  // First, collect all debug information in this function. If value names have
+  // been discarded in the LLVM IR, we can use this debug info to recover value
+  // names.
+  for (auto bb_it = F.begin(); bb_it != F.end(); ++bb_it) {
+    for (auto inst_it = bb_it->begin(); inst_it != bb_it->end(); ++inst_it) {
+      if (DbgInfoIntrinsic *debug = dyn_cast<DbgInfoIntrinsic>(inst_it))
+        collectDebugInfo(debug);
+    }
+  }
   for (auto bb_it = F.begin(); bb_it != F.end(); ++bb_it) {
     BasicBlock& bb = *bb_it;
     func_modified = runOnBasicBlock(bb);
   }
   if (F.getName() != "main")
     func_modified |= runOnFunctionEntry(F);
+
+  purgeDebugInfo();
   delete st;
   return func_modified;
 }
@@ -435,11 +448,12 @@ bool Tracer::runOnFunctionEntry(Function& func) {
   for (auto arg_it = func.arg_begin(); arg_it != func.arg_end();
        ++arg_it, ++call_id) {
     char arg_name_buf[256];
+    ValueNameLookup valueName = getValueName(arg_it);
     InstOperandParams params;
     params.param_num = is_entry_block ? call_id : FORWARD_LINE;
     params.operand_name = arg_name_buf;
     params.setDataTypeAndSize(arg_it);
-    params.is_reg = arg_it->hasName();
+    params.is_reg = valueName.first;
     params.bbid = nullptr;
 
     if (arg_it->getType()->isLabelTy()) {
@@ -450,7 +464,7 @@ bool Tracer::runOnFunctionEntry(Function& func) {
       // Nothing to do.
     } else {
       // This argument has a value to print.
-      strncpy(params.operand_name, arg_it->getName().str().c_str(),
+      strncpy(params.operand_name, valueName.second.str().c_str(),
               sizeof(arg_name_buf));
       params.operand_name[255] = 0;
       params.value = arg_it;
@@ -460,6 +474,44 @@ bool Tracer::runOnFunctionEntry(Function& func) {
   }
 
   return true;
+}
+
+void Tracer::collectDebugInfo(DbgInfoIntrinsic *debug) {
+  Value *arg = nullptr;
+  DILocalVariable *var = nullptr;
+  if (DbgDeclareInst *dbgDeclare = dyn_cast<DbgDeclareInst>(debug)) {
+    arg = dbgDeclare->getAddress();
+    var = dbgDeclare->getVariable();
+    if (isa<UndefValue>(arg) || !var)
+      return;
+  } else if (DbgValueInst *dbgValue = dyn_cast<DbgValueInst>(debug)) {
+    arg = dbgValue->getValue();
+    var = dbgValue->getVariable();
+    if (isa<UndefValue>(arg) || !var)
+      return;
+  } else if (DbgAddrIntrinsic *dbgAddr = dyn_cast<DbgAddrIntrinsic>(debug)) {
+    arg = dbgDeclare->getAddress();
+    var = dbgAddr->getVariable();
+    if (isa<UndefValue>(arg) || !var)
+      return;
+  }
+  // Aladdin does not support renamed values. All values, particularly
+  // pointers, must be addressed by their original name in the function
+  // signature. As a result, a pointer rename (e.g. via a cast) needs to be
+  // ignored.
+  if (valueDebugName.find(arg) == valueDebugName.end())
+    valueDebugName[arg] = var->getName();
+}
+
+void Tracer::purgeDebugInfo() { valueDebugName.clear(); }
+
+Tracer::ValueNameLookup Tracer::getValueName(Value *value) {
+  if (value->hasName())
+    return std::make_pair(true, value->getName());
+  auto it = valueDebugName.find(value);
+  if (it != valueDebugName.end())
+    return std::make_pair(true, it->second);
+  return std::make_pair(false, StringRef());
 }
 
 bool Tracer::traceOrNot(const std::string& func) {
@@ -629,8 +681,9 @@ bool Tracer::setOperandNameAndReg(Instruction *I, InstOperandParams *params) {
 
 bool Tracer::getInstId(Instruction *I, char *bbid, char *instid, int *instc) {
   assert(instid != nullptr);
-  if (I->hasName()) {
-    strcpy(instid, I->getName().str().c_str());
+  ValueNameLookup name = getValueName(I);
+  if (name.first) {
+    strcpy(instid, name.second.str().c_str());
     return true;
   }
   int id = st->getLocalSlot(I);
@@ -659,7 +712,8 @@ void Tracer::processAllocaInstruction(BasicBlock::iterator it) {
   AllocaInst *alloca = dyn_cast<AllocaInst>(it);
   // If this instruction's output register is already named, then we don't need
   // to do any more searching.
-  if (!alloca->hasName()) {
+  ValueNameLookup name = getValueName(alloca);
+  if (!name.first) {
     int alloca_id = st->getLocalSlot(alloca);
     bool found_debug_declare = false;
     // The debug declare call is not guaranteed to come right after the alloca.
@@ -690,14 +744,15 @@ void Tracer::processAllocaInstruction(BasicBlock::iterator it) {
 
 void Tracer::makeValueId(Value *value, char *id_str) {
   int id = st->getLocalSlot(value);
-  bool hasName = value->hasName();
+  ValueNameLookup name = getValueName(value);
+  bool hasName = name.first;
   if (BasicBlock* BB = dyn_cast<BasicBlock>(value)) {
     LoopInfo &info = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
     unsigned loop_depth = info.getLoopDepth(BB);
     // 10^3 - 1 is the maximum loop depth.
     const unsigned kMaxLoopDepthChars = 3;
     if (hasName) {
-      const std::string& bb_name = value->getName().str();
+      const std::string& bb_name = name.second.str();
       snprintf(id_str, bb_name.size() + 1 + kMaxLoopDepthChars, "%s:%u",
                bb_name.c_str(), loop_depth);
     } else {
@@ -706,7 +761,7 @@ void Tracer::makeValueId(Value *value, char *id_str) {
     return;
   }
   if (hasName)
-    strcpy(id_str, (char *)value->getName().str().c_str());
+    strcpy(id_str, (char *)name.second.str().c_str());
   if (!hasName && id >= 0)
     sprintf(id_str, "%d", id);
   assert((hasName || id != -1) &&
@@ -769,8 +824,9 @@ void Tracer::handlePhiNodes(BasicBlock* BB, InstEnv* env) {
           setOperandNameAndReg(I, &params);
           params.value = nullptr;
         } else {
-          params.is_reg = curr_operand->hasName();
-          strcpy(params.operand_name, curr_operand->getName().str().c_str());
+          ValueNameLookup name = getValueName(curr_operand);
+          params.is_reg = name.first;
+          strcpy(params.operand_name, name.second.str().c_str());
           params.value = curr_operand;
         }
         printParamLine(insertPointInst, &params);
@@ -840,6 +896,7 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
   for (auto arg_it = fun->arg_begin(); arg_it != fun->arg_end();
        ++arg_it, ++call_id) {
     Value* curr_operand = inst->getOperand(call_id);
+    ValueNameLookup name = getValueName(curr_operand);
 
     // Every argument in the function call will have two lines printed,
     // reflecting the state of the operand in the caller AND callee function.
@@ -853,7 +910,7 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
     caller.bbid = nullptr;
 
     caller.setDataTypeAndSize(curr_operand);
-    strcpy(caller.operand_name, curr_operand->getName().str().c_str());
+    strcpy(caller.operand_name, name.second.str().c_str());
 
     if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
       // This operand was produced by an instruction in this basic block (and
@@ -867,7 +924,7 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
       // This operand was not produced by this basic block. It may be a
       // constant, a local variable produced by a different basic block, a
       // global, a function argument, a code label, or something else.
-      caller.is_reg = curr_operand->hasName();
+      caller.is_reg = name.first;
       if (curr_operand->getType()->isLabelTy()) {
         // The operand name should be the code label itself. It has no value.
         makeValueId(curr_operand, caller.operand_name);
@@ -896,8 +953,9 @@ void Tracer::handleNonPhiNonCallInstruction(Instruction *inst, InstEnv* env) {
       params.param_num = i + 1;
       params.operand_name = op_name;
       params.setDataTypeAndSize(curr_operand);
-      params.is_reg = curr_operand->hasName();
-      strcpy(params.operand_name, curr_operand->getName().str().c_str());
+      ValueNameLookup name = getValueName(curr_operand);
+      params.is_reg = name.first;
+      strcpy(params.operand_name, name.second.str().c_str());
 
       if (Instruction *I = dyn_cast<Instruction>(curr_operand)) {
         setOperandNameAndReg(I, &params);
@@ -929,10 +987,11 @@ void Tracer::handleInstructionResult(Instruction *inst, Instruction *next_inst,
   BitCastInst* bitcast = dyn_cast<BitCastInst>(inst);
   if (bitcast) {
     Value* operand = bitcast->getOperand(0);
+    ValueNameLookup name = getValueName(operand);
     int id = st->getLocalSlot(bitcast);
     if (slotToVarName.find(id) == slotToVarName.end() &&
-        operand->getType()->isPointerTy() && operand->hasName()) {
-      strcpy(env->instid, operand->getName().str().c_str());
+        operand->getType()->isPointerTy() && name.first) {
+      strcpy(env->instid, name.second.str().c_str());
       slotToVarName[id] = env->instid;
     }
   }
