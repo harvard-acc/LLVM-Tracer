@@ -104,7 +104,7 @@ void llvmtracer_set_trace_name(char *trace_name) {
 // --------------------------------------------
 //
 //                      if current_function == current_toplevel_function
-//    1     1     1         LOG_AND_STOP
+//    1     1     1         DO_NOT_LOG
 //                      else
 //                          BAD_BEHAVIOR
 //
@@ -130,7 +130,7 @@ logging_status log_or_not(bool is_toplevel_mode, bool is_toplevel_function,
            "Returning from within a toplevel function before it was called!");
 
   if (strcmp(current_function, trace->current_toplevel_function.c_str()) == 0)
-    return LOG_AND_STOP;
+    return DO_NOT_LOG;
 
   assert(false && "Cannot call a top level function from within another one!");
 
@@ -151,23 +151,22 @@ void convert_bytes_to_hex(char* buf, uint8_t* value, int size) {
   *buf = 0;
 }
 
-void update_logging_status(char *name, int opcode,
-                           bool is_tracked_function, bool is_toplevel_mode) {
-  // LOG_AND_STOP would have been set by the previous instruction (which should
-  // be logged), and this is already the next one, so STOP.
-  if (trace->current_logging_status == LOG_AND_STOP) {
+void trace_logger_update_status(char *name, int opcode,
+                                bool is_tracked_function,
+                                bool is_toplevel_mode) {
+  if (!trace)
+    return;
+  logging_status temp = trace->current_logging_status;
+  trace->current_logging_status =
+      log_or_not(is_toplevel_mode, is_tracked_function, opcode, name);
+
+  if (temp == LOG_AND_CONTINUE && trace->current_logging_status == DO_NOT_LOG) {
     printf("%s: Stopping logging at inst %ld.\n", trace->trace_name.c_str(),
            trace->inst_count);
-    trace->current_logging_status = DO_NOT_LOG;
     fflush(stdout);
     fin_toplevel();
     return;
   }
-
-  logging_status temp = trace->current_logging_status;
-
-  trace->current_logging_status =
-      log_or_not(is_toplevel_mode, is_tracked_function, opcode, name);
 
   if (temp == DO_NOT_LOG && trace->current_logging_status != temp) {
     printf("%s: Starting to log at inst = %ld.\n", trace->trace_name.c_str(),
@@ -178,7 +177,7 @@ void update_logging_status(char *name, int opcode,
   if (trace->current_toplevel_function.length() == 0 &&
       trace->current_logging_status == LOG_AND_CONTINUE) {
     trace->current_toplevel_function.assign(name, strlen(name));
-  } else if (trace->current_logging_status == LOG_AND_STOP) {
+  } else if (trace->current_logging_status == DO_NOT_LOG) {
     trace->current_toplevel_function = "";
   }
 }
@@ -193,10 +192,6 @@ void trace_logger_log_entry(char *func_name, int num_parameters) {
   if (!trace)
     return;
 
-  // The opcode doesn't matter, as long as it's not RET_OP, and this
-  // instrumentation function will only be inserted if we are in top-level mode
-  // and the function is a tracked function.
-  update_logging_status(func_name, 0, true, true);
   if (do_not_log())
     return;
 
@@ -209,7 +204,6 @@ void trace_logger_log0(int line_number, char *name, char *bbid, char *instid,
   if (!trace)
     return;
 
-  update_logging_status(name, opcode, is_tracked_function, is_toplevel_mode);
   if (do_not_log())
     return;
 

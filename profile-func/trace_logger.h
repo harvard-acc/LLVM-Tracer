@@ -14,8 +14,6 @@
 #define RET_OP 1
 
 enum logging_status {
-  // Log the current instruction (and its parameters) and then stop.
-  LOG_AND_STOP,
   // Log the current instruction and continue logging.
   LOG_AND_CONTINUE,
   // Do not log the current instruction.
@@ -53,6 +51,9 @@ extern "C" {
                                char *label, int is_phi, char *prev_bbid);
   void trace_logger_log_vector(int line, int size, uint8_t *value, int is_reg,
                                char *label, int is_phi, char *prev_bbid);
+  void trace_logger_update_status(char *name, int opcode,
+                                  bool is_tracked_function,
+                                  bool is_toplevel_mode);
   void llvmtracer_set_trace_name(char *trace_name);
 }
 void fin_main();
@@ -60,6 +61,4 @@ void fin_toplevel();
 logging_status log_or_not(bool is_toplevel_mode, bool is_toplevel_function,
                           int opcode, char *current_function);
 void convert_bytes_to_hex(char *buf, uint8_t *value, int size);
-void update_logging_status(char *name, int opcode, bool is_tracked_function,
-                           bool is_toplevel_mode);
 bool do_not_log();
