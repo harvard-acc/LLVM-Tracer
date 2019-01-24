@@ -33,8 +33,7 @@
 #define DMA_FENCE 97
 #define DMA_STORE 98
 #define DMA_LOAD 99
-#define SINE 102
-#define COSINE 103
+#define SPECIAL_MATH_OP 102
 #define INTRINSIC 104
 
 char s_phi[] = "phi";
@@ -110,6 +109,30 @@ std::vector<std::string> intrinsics = {
   "llvm.umul.with.overflow",
   "llvm.fmuladd",  // specialised arithmetic
   "llvm.x86.",  // x86 intrinsics
+};
+
+std::vector<std::string> special_math_ops = {
+  "acos",
+  "asin",
+  "atan",
+  "atan2",
+  "cos",
+  "cosh",
+  "sin",
+  "sinh",
+  "tanh",
+  "exp",
+  "frexp",
+  "ldexp",
+  "log",
+  "log10",
+  "modf",
+  "pow",
+  "sqrt",
+  "ceil",
+  "fabs",
+  "floor",
+  "fmod",
 };
 
 }  // end of anonymous namespace
@@ -479,6 +502,15 @@ bool Tracer::isLLVMIntrinsic(const std::string& func) {
   return false;
 }
 
+bool Tracer::isSpecialMathOp(const std::string& func) {
+  for (size_t i = 0; i < special_math_ops.size(); i++) {
+    if (func.compare(special_math_ops[i]) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void Tracer::printParamLine(Instruction *I, InstOperandParams *params) {
   printParamLine(I, params->param_num, params->operand_name, params->bbid,
                  params->datatype, params->datasize, params->value,
@@ -800,10 +832,8 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
     opcode = DMA_FENCE;
   else if (fun->getName() == "setReadyBits")
     opcode = SET_READY_BITS;
-  else if (fun->getName() == "sin")
-    opcode = SINE;
-  else if (fun->getName() == "cos")
-    opcode = COSINE;
+  else if (isSpecialMathOp(fun->getName().str()))
+    opcode = SPECIAL_MATH_OP;
   else if (fun->isIntrinsic())
     opcode = INTRINSIC;
   else

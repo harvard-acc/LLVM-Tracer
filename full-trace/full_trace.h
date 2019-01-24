@@ -144,6 +144,8 @@ class Tracer : public FunctionPass {
     bool isDmaFunction(const std::string& funcName);
     // Is this function an LLVM intrinsic?
     bool isLLVMIntrinsic(const std::string& func);
+    // Is this function math operation?
+    bool isSpecialMathOp(const std::string& func);
 
     // Construct an ID for the given instruction.
     //
