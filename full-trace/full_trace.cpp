@@ -217,6 +217,8 @@ bool Tracer::doInitialization(Module &M) {
   TL_log_vector = M.getOrInsertFunction( "trace_logger_log_vector", VoidTy,
       I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy, I64Ty, I8PtrTy);
 
+  TL_update_status = M.getOrInsertFunction("trace_logger_update_status", VoidTy,
+                                           I8PtrTy, I64Ty, I1Ty, I1Ty);
 
   // We will instrument in top level mode if there is only one workload
   // function or if explicitly told to do so.
@@ -435,13 +437,14 @@ bool Tracer::runOnFunctionEntry(Function& func) {
     break;
   }
 
+  Instruction *insertPointInst = cast<Instruction>(insertp);
   std::string funcName = func.getName().str();
   bool is_entry_block = isTrackedFunction(funcName) && is_toplevel_mode;
   if (is_entry_block) {
     InstEnv env;
     strncpy(env.funcName, funcName.c_str(), InstEnv::BUF_SIZE);
-    printTopLevelEntryFirstLine(cast<Instruction>(insertp), &env,
-                                func.arg_size());
+    updateTracerStatus(insertPointInst, &env, 0);
+    printTopLevelEntryFirstLine(insertPointInst, &env, func.arg_size());
   }
 
   int call_id = 1;
@@ -470,7 +473,7 @@ bool Tracer::runOnFunctionEntry(Function& func) {
       params.value = arg_it;
     }
 
-    printParamLine(cast<Instruction>(insertp), &params);
+    printParamLine(insertPointInst, &params);
   }
 
   return true;
@@ -642,6 +645,22 @@ void Tracer::printTopLevelEntryFirstLine(Instruction *I, InstEnv *env,
   Value* v_num_params = ConstantInt::get(IRB.getInt64Ty(), num_params);
   Value *args[] = { vv_func_name, v_num_params };
   IRB.CreateCall(TL_log_entry, args);
+}
+
+void Tracer::updateTracerStatus(Instruction *I, InstEnv *env, int opcode) {
+  IRBuilder<> IRB(I);
+  Constant *func_name = createStringArgIfNotExists(env->funcName);
+  if (env->to_fxpt)
+    opcode = opcodeToFixedPoint(opcode);
+  Value *v_opcode = ConstantInt::get(IRB.getInt64Ty(), opcode);
+  Value *v_is_tracked_function = ConstantInt::get(
+      IRB.getInt1Ty(),
+      (tracked_functions.find(env->funcName) != tracked_functions.end()));
+  Value *v_is_toplevel_mode =
+      ConstantInt::get(IRB.getInt1Ty(), is_toplevel_mode);
+  Value *args[] = {func_name, v_opcode, v_is_tracked_function,
+                   v_is_toplevel_mode};
+  IRB.CreateCall(TL_update_status, args);
 }
 
 unsigned Tracer::opcodeToFixedPoint(unsigned opcode) {
@@ -975,6 +994,9 @@ void Tracer::handleNonPhiNonCallInstruction(Instruction *inst, InstEnv* env) {
       }
       printParamLine(inst, &params);
     }
+  }
+  if (isa<ReturnInst>(inst)) {
+    updateTracerStatus(inst, env, inst->getOpcode());
   }
 }
 
