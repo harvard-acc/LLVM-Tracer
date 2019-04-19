@@ -4,6 +4,7 @@ thread_local trace_info *trace = nullptr;
 std::map<std::string, gzFile> gz_files;
 pthread_mutex_t lock;
 std::string labelmap_str;
+const char* default_trace_name = "dynamic_trace.gz";
 
 void create_trace(const char *trace_name) {
   assert(!trace && "Trace has already been created!");
@@ -50,13 +51,13 @@ void trace_logger_init() {
     exit(-1);
   }
   // Create a trace for the main thread.
-  create_trace("dynamic_trace.gz");
+  create_trace(default_trace_name);
   atexit(&fin_main);
 }
 
 // Called at the exit of the main function.
 void fin_main() {
-  if (!trace)
+  if (trace)
     fin_toplevel();
   for (auto it = gz_files.begin(); it != gz_files.end(); ++it) {
     gzclose(it->second);
@@ -152,12 +153,14 @@ void convert_bytes_to_hex(char* buf, uint8_t* value, int size) {
   *buf = 0;
 }
 
+// This function is called after every return instruction to update the
+// tracer's status - that is, whether or not it should keep tracing.
 void trace_logger_update_status(char *name, int opcode,
                                 bool is_tracked_function,
                                 bool is_toplevel_mode) {
   if (!trace) {
     if (is_tracked_function)
-      create_trace("dynamic_trace.gz");
+      create_trace(default_trace_name);
     else
       return;
   }
@@ -192,9 +195,13 @@ bool do_not_log() {
   return trace->current_logging_status == DO_NOT_LOG;
 }
 
+// Prints an entry block upon calling a top level function. This also needs to
+// reinitialize the trace state, since the last top level function exit would
+// have deleted it.
 void trace_logger_log_entry(char *func_name, int num_parameters) {
-  if (!trace)
-    return;
+  if (!trace) {
+    create_trace(default_trace_name);
+  }
 
   if (do_not_log())
     return;
