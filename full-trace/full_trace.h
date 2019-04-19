@@ -140,12 +140,6 @@ class Tracer : public FunctionPass {
     void printTopLevelEntryFirstLine(Instruction *I, InstEnv *env,
                                      int num_params);
 
-    // Update the tracer logging status on this instruction.
-    //
-    // This is usually only called to inform the tracer to start or stop
-    // tracing after calling or returning from a top level function.
-    void updateTracerStatus(Instruction *I, InstEnv *env, int opcode);
-
     // Should we trace this function or not?
     bool traceOrNot(const std::string& func);
     // Does this function appear in our list of tracked functions?
@@ -262,7 +256,6 @@ class Tracer : public FunctionPass {
     Value *TL_log_double;
     Value *TL_log_vector;
     Value *TL_log_entry;
-    Value *TL_update_status;
 
     // The current module.
     Module *curr_module;
