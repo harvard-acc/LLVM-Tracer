@@ -497,13 +497,18 @@ void Tracer::collectDebugInfo(DbgInfoIntrinsic *debug) {
     var = dbgAddr->getVariable();
     if (isa<UndefValue>(arg) || !var)
       return;
+  } else {
+      return;
   }
   // Aladdin does not support renamed values. All values, particularly
   // pointers, must be addressed by their original name in the function
   // signature. As a result, a pointer rename (e.g. via a cast) needs to be
   // ignored.
-  if (valueDebugName.find(arg) == valueDebugName.end())
+  if (isa<BitCastInst>(arg))
+      return;
+  if (valueDebugName.find(arg) == valueDebugName.end()) {
     valueDebugName[arg] = var->getName();
+  }
 }
 
 void Tracer::purgeDebugInfo() { valueDebugName.clear(); }
