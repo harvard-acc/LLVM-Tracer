@@ -154,6 +154,8 @@ class Tracer : public FunctionPass {
     bool isDmaFunction(const std::string& funcName);
     // Is this function an LLVM intrinsic?
     bool isLLVMIntrinsic(const std::string& func);
+    // Is this set sampling factor function?
+    bool isSetSamplingFactor(const std::string &funcName);
 
     // Construct an ID for the given instruction.
     //
@@ -259,6 +261,7 @@ class Tracer : public FunctionPass {
     Value *TL_log0;
     Value *TL_log_int;
     Value *TL_log_ptr;
+    Value *TL_log_string;
     Value *TL_log_double;
     Value *TL_log_vector;
     Value *TL_log_entry;

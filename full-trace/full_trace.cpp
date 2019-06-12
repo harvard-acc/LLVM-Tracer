@@ -32,6 +32,7 @@
 #define SINE 102
 #define COSINE 103
 #define INTRINSIC 104
+#define SET_SAMPLING_FACTOR 105
 
 char s_phi[] = "phi";
 using namespace llvm;
@@ -211,6 +212,10 @@ bool Tracer::doInitialization(Module &M) {
   TL_log_ptr = M.getOrInsertFunction( "trace_logger_log_ptr", VoidTy,
       I64Ty, I64Ty, I64Ty, I64Ty, I8PtrTy, I64Ty, I8PtrTy);
 
+  TL_log_string =
+      M.getOrInsertFunction("trace_logger_log_string", VoidTy, I64Ty, I64Ty,
+                            I8PtrTy, I64Ty, I8PtrTy, I64Ty, I8PtrTy);
+
   TL_log_double = M.getOrInsertFunction( "trace_logger_log_double", VoidTy,
       I64Ty, I64Ty, DoubleTy, I64Ty, I8PtrTy, I64Ty, I8PtrTy);
 
@@ -327,7 +332,7 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
   if (!is_toplevel_mode && !isTrackedFunction(funcName))
     return false;
 
-  if (isDmaFunction(funcName))
+  if (isDmaFunction(funcName) || isSetSamplingFactor(funcName))
     return false;
 
   if (verbose)
@@ -373,7 +378,8 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
       }
       const std::string &called_func_name = called_func->getName().str();
       if (isLLVMIntrinsic(called_func_name) ||
-          isDmaFunction(called_func_name)) {
+          isDmaFunction(called_func_name) ||
+          isSetSamplingFactor(called_func_name)) {
         // There are certain intrinsic functions which represent real work the
         // accelerator may want to do, which we want to capture. These include
         // special math operators, memcpy, and target-specific instructions.
@@ -579,14 +585,38 @@ void Tracer::printParamLine(Instruction *I, int param_num, const char *reg_id,
                         vv_reg_id, v_is_phi, vv_prev_bbid };
       IRB.CreateCall(TL_log_double, args);
     } else if (datatype == llvm::Type::PointerTyID) {
-      Value *v_value;
-      if (is_intrinsic)
+      Value *v_value = nullptr;
+      Type *pteetype = value->getType()->getPointerElementType();
+      bool is_string = false;
+      if (is_intrinsic) {
         v_value = ConstantInt::get(IRB.getInt64Ty(), 0);
-      else
+      } else {
         v_value = IRB.CreatePtrToInt(value, IRB.getInt64Ty());
-      Value *args[] = { v_param_num,    v_size,   v_value,     v_is_reg,
-                        vv_reg_id, v_is_phi, vv_prev_bbid };
-      IRB.CreateCall(TL_log_ptr, args);
+        // If the pointee type is 8-bit integer, get the string.
+        // TODO: the code below only works for constant expressio strings, but
+        // not for mutable strings.
+        if (IntegerType *itype = dyn_cast<IntegerType>(pteetype)) {
+          if (itype->getBitWidth() == 8) {
+            if (ConstantExpr *ce = dyn_cast<ConstantExpr>(value)) {
+              if (GlobalVariable *gv =
+                      dyn_cast<GlobalVariable>(ce->getOperand(0))) {
+                if (ConstantDataArray *array =
+                        dyn_cast<ConstantDataArray>(gv->getInitializer())) {
+                  v_value =
+                      createStringArgIfNotExists(array->getAsCString().data());
+                  is_string = true;
+                }
+              }
+            }
+          }
+        }
+      }
+      Value *args[] = { v_param_num, v_size,   v_value,     v_is_reg,
+                        vv_reg_id,   v_is_phi, vv_prev_bbid };
+      if (is_string)
+        IRB.CreateCall(TL_log_string, args);
+      else
+        IRB.CreateCall(TL_log_ptr, args);
     } else if (datatype == llvm::Type::VectorTyID) {
       // Give the logger function a pointer to the data. We'll read it out in
       // the logger function itself.
@@ -799,6 +829,10 @@ bool Tracer::isDmaFunction(const std::string& funcName) {
           funcName == "setReadyBits");
 }
 
+bool Tracer::isSetSamplingFactor(const std::string &funcName) {
+  return funcName == "setSamplingFactor";
+}
+
 void Tracer::setLineNumberIfExists(Instruction *I, InstEnv *env) {
   if (MDNode *N = I->getMetadata("dbg")) {
     DILocation* loc = dyn_cast<DILocation>(N);
@@ -890,6 +924,8 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
     opcode = DMA_FENCE;
   else if (fun->getName() == "setReadyBits")
     opcode = SET_READY_BITS;
+  else if (fun->getName() == "setSamplingFactor")
+    opcode = SET_SAMPLING_FACTOR;
   else if (fun->getName() == "sin")
     opcode = SINE;
   else if (fun->getName() == "cos")

@@ -46,6 +46,8 @@ extern "C" {
   void trace_logger_log_entry(char *func_name, int num_parameters);
   void trace_logger_log_ptr(int line, int size, uint64_t value, int is_reg,
                             char *label, int is_phi, char *prev_bbid);
+  void trace_logger_log_string(int line, int size, char *value, int is_reg,
+                               char *label, int is_phi, char *prev_bbid);
   void trace_logger_log_int(int line, int size, int64_t value, int is_reg,
                             char *label, int is_phi, char *prev_bbid);
   void trace_logger_log_double(int line, int size, double value, int is_reg,
