@@ -40,6 +40,13 @@ label_in_between:
   *x = 1;
 }
 
+static void static_function(int *x) {
+  static_loop:
+  for (int i = 0; i < 10; i++) {
+    *x += i;
+  }
+}
+
 int main() {
   int x = 4;
   printf("x = %d\n", x);
@@ -54,6 +61,9 @@ int main() {
   printf("x = %d\n", x);
 
   different_line(&x);
+  printf("x = %d\n", x);
+
+  static_function(&x);
   printf("x = %d\n", x);
 
   return 0;

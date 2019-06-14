@@ -34,11 +34,14 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "clang/Tooling/Tooling.h"
+#include "llvm/Support/Debug.h"
 
 using namespace clang;
 using namespace clang::driver;
 using namespace clang::tooling;
 using namespace llvm;
+
+#define DEBUG_TYPE "get-labeled-stmts"
 
 // The option categories, to group options in the man page. It is useless
 // here, since we don't have any new options in this tool.
@@ -108,8 +111,8 @@ class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
                      const FunctionDecl* func) const {
     SourceLocation loc = subStmt->getLocStart();
     unsigned line = srcManager->getExpansionLineNumber(loc);
-    std::string labelName(labelStmt->getName());
-    const std::string& funcName = func->getName().str();
+    const std::string& labelName = labelStmt->getName();
+    const std::string& funcName = func->getQualifiedNameAsString();
     labelMap[funcName][labelName] = line;
   }
 
@@ -145,8 +148,8 @@ class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
     if (callExpr) {
       const FunctionDecl* callee = callExpr->getDirectCallee();
       if (callee) {
-        labelMap[callee->getName().str()].add_caller(
-            caller_func->getName().str());
+        labelMap[callee->getQualifiedNameAsString()].add_caller(
+            caller_func->getQualifiedNameAsString());
       }
     }
   }
@@ -171,11 +174,12 @@ class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
 
   // For each function, recursively find every child label statement.
   bool VisitFunctionDecl(const FunctionDecl *func) const {
-    if (func->getLanguageLinkage() != clang::CLanguageLinkage)
+    // Only support free functions, not class member functions or templates.
+    if (isa<CXXMethodDecl>(func))
       return true;
 
     if (func->hasBody()) {
-      const std::string& funcName = func->getName().str();
+      const std::string& funcName = func->getQualifiedNameAsString();
       if (labelMap.find(funcName) == labelMap.end())
         labelMap[funcName] = FunctionInfo();
 
