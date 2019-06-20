@@ -48,6 +48,10 @@ using namespace llvm;
 // Declaring here because CommonOptionsParser requires this one in LLVM 3.5.
 // http://llvm.org/docs/CommandLine.html#grouping-options-into-categories
 cl::OptionCategory GetLabelStmtsCat("GetLabelStmts options");
+static cl::opt<std::string> OutputFileName("output",
+                                           cl::desc("Specify output filename"),
+                                           cl::value_desc("filename"),
+                                           cl::init("labelmap"));
 
 // A class containing all the labels and caller information for a function.
 class FunctionInfo {
@@ -93,7 +97,7 @@ class FunctionInfo {
 
 // Maps pairs of (func_name, label_name) to line numbers.
 static std::map<std::string, FunctionInfo> labelMap;
-static const std::string outputFileName = "labelmap";
+static std::string outputFileName;
 
 class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
  private:
@@ -307,6 +311,7 @@ static void cleanup() {
 int main(int argc, const char** argv) {
   CommonOptionsParser op(argc, argv, GetLabelStmtsCat);
   ClangTool Tool(op.getCompilations(), op.getSourcePathList());
+  outputFileName = OutputFileName.getValue();
   cleanup();
 
   std::unique_ptr<FrontendActionFactory>
