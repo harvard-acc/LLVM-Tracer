@@ -968,6 +968,7 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
     caller.param_num = call_id + 1;
     caller.operand_name = caller_op_name;
     caller.bbid = nullptr;
+    caller.is_intrinsic = params.is_intrinsic;
 
     caller.setDataTypeAndSize(curr_operand);
     strcpy(caller.operand_name, name.second.str().c_str());
