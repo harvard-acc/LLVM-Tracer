@@ -307,6 +307,18 @@ bool Tracer::runOnFunction(Function &F) {
         collectDebugInfo(debug);
     }
   }
+
+  // Collect all preheader branch instructions (the one at the end of a
+  // preheader block). Use the loop's start location as the preheader's line
+  // num.
+  LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
+  for (auto bb_it = F.begin(); bb_it != F.end(); ++bb_it) {
+    if (Loop *loop = LI.getLoopFor(&*bb_it))
+      if (BasicBlock *PHeadBB = loop->getLoopPreheader())
+        if (Instruction *PHeadInst = PHeadBB->getTerminator())
+          preheaderLineNum[PHeadInst] = loop->getStartLoc().getLine();
+  }
+
   for (auto bb_it = F.begin(); bb_it != F.end(); ++bb_it) {
     BasicBlock& bb = *bb_it;
     func_modified = runOnBasicBlock(bb);
@@ -517,7 +529,10 @@ void Tracer::collectDebugInfo(DbgInfoIntrinsic *debug) {
   }
 }
 
-void Tracer::purgeDebugInfo() { valueDebugName.clear(); }
+void Tracer::purgeDebugInfo() {
+  valueDebugName.clear();
+  preheaderLineNum.clear();
+}
 
 Tracer::ValueNameLookup Tracer::getValueName(Value *value) {
   if (value->hasName())
@@ -834,6 +849,13 @@ bool Tracer::isSetSamplingFactor(const std::string &funcName) {
 }
 
 void Tracer::setLineNumberIfExists(Instruction *I, InstEnv *env) {
+  // If this instruction is a preheader branch, use the recorded loop starting
+  // location as its line number.
+  if (preheaderLineNum.find(I) != preheaderLineNum.end()) {
+    env->line_number = preheaderLineNum[I];
+    return;
+  }
+  // Otherwise, use debug info.
   if (MDNode *N = I->getMetadata("dbg")) {
     DILocation* loc = dyn_cast<DILocation>(N);
     if (loc) {

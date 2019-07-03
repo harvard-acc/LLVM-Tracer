@@ -309,6 +309,9 @@ class Tracer : public FunctionPass {
 
     // Debug info cache of value names.
     std::map<Value*, StringRef> valueDebugName;
+
+    // Preheader branch instructions and their line numbers.
+    std::map<Instruction*, int> preheaderLineNum;
 };
 
 /* Reads a labelmap file and inserts it into the dynamic trace.
