@@ -33,6 +33,8 @@
 #define COSINE 103
 #define INTRINSIC 104
 #define SET_SAMPLING_FACTOR 105
+#define HOST_STORE 106
+#define HOST_LOAD 107
 
 char s_phi[] = "phi";
 using namespace llvm;
@@ -344,7 +346,8 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
   if (!is_toplevel_mode && !isTrackedFunction(funcName))
     return false;
 
-  if (isDmaFunction(funcName) || isSetSamplingFactor(funcName))
+  if (isDmaFunction(funcName) || isHostMemFunction(funcName) ||
+      isSetSamplingFactor(funcName))
     return false;
 
   if (verbose)
@@ -391,6 +394,7 @@ bool Tracer::runOnBasicBlock(BasicBlock &BB) {
       const std::string &called_func_name = called_func->getName().str();
       if (isLLVMIntrinsic(called_func_name) ||
           isDmaFunction(called_func_name) ||
+          isHostMemFunction(called_func_name) ||
           isSetSamplingFactor(called_func_name)) {
         // There are certain intrinsic functions which represent real work the
         // accelerator may want to do, which we want to capture. These include
@@ -844,6 +848,10 @@ bool Tracer::isDmaFunction(const std::string& funcName) {
           funcName == "setReadyBits");
 }
 
+bool Tracer::isHostMemFunction(const std::string& funcName) {
+  return (funcName == "hostLoad" || funcName == "hostStore");
+}
+
 bool Tracer::isSetSamplingFactor(const std::string &funcName) {
   return funcName == "setSamplingFactor";
 }
@@ -948,6 +956,10 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
     opcode = SET_READY_BITS;
   else if (fun->getName() == "setSamplingFactor")
     opcode = SET_SAMPLING_FACTOR;
+  else if (fun->getName() == "hostLoad")
+    opcode = HOST_LOAD;
+  else if (fun->getName() == "hostStore")
+    opcode = HOST_STORE;
   else if (fun->getName() == "sin")
     opcode = SINE;
   else if (fun->getName() == "cos")

@@ -152,6 +152,8 @@ class Tracer : public FunctionPass {
     bool isTrackedFunction(const std::string& func);
     // Is this function one of the special DMA functions?
     bool isDmaFunction(const std::string& funcName);
+    // Is this function one of the special Host memory functions?
+    bool isHostMemFunction(const std::string& funcName);
     // Is this function an LLVM intrinsic?
     bool isLLVMIntrinsic(const std::string& func);
     // Is this set sampling factor function?
