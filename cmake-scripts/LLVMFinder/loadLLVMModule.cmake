@@ -32,7 +32,7 @@ FUNCTION(loadLLVMModule LLVM_ROOT NEED_LLVM_LIB_LIST)
   # The llvm's cmake module only contained in the LLVM which is build
   # through CMake. Package pool of most linux distributions do not contained
   # this module. This command try the CMake module of LLVM.
-  find_package(LLVM 3.4 QUIET)
+  find_package(LLVM 6.0 QUIET)
 
   if(${LLVM_FOUND})
     if(${LLVM_RECOMMEND_VERSION} VERSION_LESS 3.5)

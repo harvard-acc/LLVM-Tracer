@@ -4,7 +4,8 @@
 
 CURRENT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 COMMON_DIR := $(CURRENT_DIR)
-SRCS = $(wildcard *.c)
+SUFFIX = cpp
+SRCS = $(wildcard *.$(SUFFIX))
 EXEC = test
 
 .PHONY: trace-binary run-trace clean
@@ -29,7 +30,7 @@ GET_LABELED_STMTS = $(TRACER_HOME)/bin/get-labeled-stmts
 ALL_SRCS = $(SRCS)
 CPPFLAGS = -I$(COMMON_DIR)
 
-LLVM_OBJS = $(patsubst %.c, %-opt.llvm, $(ALL_SRCS))
+LLVM_OBJS = $(patsubst %.$(SUFFIX), %-opt.llvm, $(ALL_SRCS))
 LLVM_VERSION = $(shell clang --version | grep -o -m 1 "[0-9\.]\+" | head -n 1)
 
 #########################################################
@@ -50,7 +51,7 @@ full.s: full.llvm
 $(EXEC)-instrumented: full.s
 	$(CXX) -static -O0 -fno-inline -o $@ $< -lm -lz -pthread
 
-%-opt.llvm: %.c labelmap
+%-opt.llvm: %.$(SUFFIX) labelmap
 	clang -static -g -O1 -S -fno-slp-vectorize -fno-vectorize -fno-unroll-loops \
         -fno-inline -fno-builtin -emit-llvm \
 				$(CPPFLAGS) \

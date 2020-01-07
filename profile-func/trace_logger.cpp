@@ -4,9 +4,10 @@ thread_local trace_info *trace = nullptr;
 std::map<std::string, gzFile> gz_files;
 pthread_mutex_t lock;
 std::string labelmap_str;
+const char* default_trace_name = "dynamic_trace.gz";
 
-void create_trace(char *trace_name) {
-  assert(!trace);
+void create_trace(const char *trace_name) {
+  assert(!trace && "Trace has already been created!");
   trace = new trace_info(trace_name);
 }
 
@@ -38,7 +39,8 @@ void open_trace_file() {
   pthread_mutex_unlock(&lock);
 }
 
-void trace_logger_register_labelmap(char *labelmap_buf, size_t labelmap_size) {
+void trace_logger_register_labelmap(const char *labelmap_buf,
+                                    size_t labelmap_size) {
   labelmap_str.assign(labelmap_buf, labelmap_size);
 }
 
@@ -49,13 +51,13 @@ void trace_logger_init() {
     exit(-1);
   }
   // Create a trace for the main thread.
-  create_trace("dynamic_trace.gz");
+  create_trace(default_trace_name);
   atexit(&fin_main);
 }
 
 // Called at the exit of the main function.
 void fin_main() {
-  if (!trace)
+  if (trace)
     fin_toplevel();
   for (auto it = gz_files.begin(); it != gz_files.end(); ++it) {
     gzclose(it->second);
@@ -69,11 +71,11 @@ void fin_toplevel() {
 }
 
 // Called before calling a top-level function.
-void llvmtracer_set_trace_name(char *trace_name) {
+void llvmtracer_set_trace_name(const char *trace_name) {
   if (!trace)
     create_trace(trace_name);
   else
-    trace->trace_name.assign(trace_name, strlen(trace_name));
+    trace->trace_name = trace_name;
 }
 
 // Determine whether to trace the current and next instructions.
@@ -104,7 +106,7 @@ void llvmtracer_set_trace_name(char *trace_name) {
 // --------------------------------------------
 //
 //                      if current_function == current_toplevel_function
-//    1     1     1         LOG_AND_STOP
+//    1     1     1         DO_NOT_LOG
 //                      else
 //                          BAD_BEHAVIOR
 //
@@ -130,7 +132,7 @@ logging_status log_or_not(bool is_toplevel_mode, bool is_toplevel_function,
            "Returning from within a toplevel function before it was called!");
 
   if (strcmp(current_function, trace->current_toplevel_function.c_str()) == 0)
-    return LOG_AND_STOP;
+    return DO_NOT_LOG;
 
   assert(false && "Cannot call a top level function from within another one!");
 
@@ -151,23 +153,26 @@ void convert_bytes_to_hex(char* buf, uint8_t* value, int size) {
   *buf = 0;
 }
 
-void update_logging_status(char *name, int opcode,
-                           bool is_tracked_function, bool is_toplevel_mode) {
-  // LOG_AND_STOP would have been set by the previous instruction (which should
-  // be logged), and this is already the next one, so STOP.
-  if (trace->current_logging_status == LOG_AND_STOP) {
-    printf("%s: Stopping logging at inst %ld.\n", trace->trace_name.c_str(),
-           trace->inst_count);
-    trace->current_logging_status = DO_NOT_LOG;
-    fflush(stdout);
-    fin_toplevel();
-    return;
+// This function is called after every return instruction to update the
+// tracer's status - that is, whether or not it should keep tracing.
+void trace_logger_update_status(char *name, int opcode,
+                                bool is_tracked_function,
+                                bool is_toplevel_mode) {
+  if (!trace) {
+    if (is_tracked_function)
+      create_trace(default_trace_name);
+    else
+      return;
   }
-
   logging_status temp = trace->current_logging_status;
-
   trace->current_logging_status =
       log_or_not(is_toplevel_mode, is_tracked_function, opcode, name);
+
+  if (temp == LOG_AND_CONTINUE && trace->current_logging_status == DO_NOT_LOG) {
+    printf("%s: Stopping logging at inst %ld.\n", trace->trace_name.c_str(),
+           trace->inst_count);
+    fflush(stdout);
+  }
 
   if (temp == DO_NOT_LOG && trace->current_logging_status != temp) {
     printf("%s: Starting to log at inst = %ld.\n", trace->trace_name.c_str(),
@@ -177,9 +182,10 @@ void update_logging_status(char *name, int opcode,
 
   if (trace->current_toplevel_function.length() == 0 &&
       trace->current_logging_status == LOG_AND_CONTINUE) {
-    trace->current_toplevel_function.assign(name, strlen(name));
-  } else if (trace->current_logging_status == LOG_AND_STOP) {
+    trace->current_toplevel_function = name;
+  } else if (trace->current_logging_status == DO_NOT_LOG) {
     trace->current_toplevel_function = "";
+    fin_toplevel();
   }
 }
 
@@ -189,14 +195,14 @@ bool do_not_log() {
   return trace->current_logging_status == DO_NOT_LOG;
 }
 
+// Prints an entry block upon calling a top level function. This also needs to
+// reinitialize the trace state, since the last top level function exit would
+// have deleted it.
 void trace_logger_log_entry(char *func_name, int num_parameters) {
-  if (!trace)
-    return;
+  if (!trace) {
+    create_trace(default_trace_name);
+  }
 
-  // The opcode doesn't matter, as long as it's not RET_OP, and this
-  // instrumentation function will only be inserted if we are in top-level mode
-  // and the function is a tracked function.
-  update_logging_status(func_name, 0, true, true);
   if (do_not_log())
     return;
 
@@ -209,7 +215,6 @@ void trace_logger_log0(int line_number, char *name, char *bbid, char *instid,
   if (!trace)
     return;
 
-  update_logging_status(name, opcode, is_tracked_function, is_toplevel_mode);
   if (do_not_log())
     return;
 
@@ -254,6 +259,34 @@ void trace_logger_log_ptr(int line, int size, uint64_t value, int is_reg,
     gzprintf(gz_file, "f,%d,%#llx,%d", size, value, is_reg);
   else
     gzprintf(gz_file, "%d,%d,%#llx,%d", line, size, value, is_reg);
+  if (is_reg)
+    gzprintf(gz_file, ",%s", label);
+  else
+    gzprintf(gz_file, ", ");
+  if (is_phi)
+    gzprintf(gz_file, ",%s,\n", prev_bbid);
+  else
+    gzprintf(gz_file, ",\n");
+}
+
+void trace_logger_log_string(int line,
+                             int size,
+                             char *value,
+                             int is_reg,
+                             char *label,
+                             int is_phi,
+                             char *prev_bbid) {
+  if (!trace || do_not_log())
+    return;
+
+  gzFile gz_file = trace->trace_file;
+
+  if (line == RESULT_LINE)
+    gzprintf(gz_file, "r,%d,%s,%d", size, value, is_reg);
+  else if (line == FORWARD_LINE)
+    gzprintf(gz_file, "f,%d,%s,%d", size, value, is_reg);
+  else
+    gzprintf(gz_file, "%d,%d,%s,%d", line, size, value, is_reg);
   if (is_reg)
     gzprintf(gz_file, ",%s", label);
   else

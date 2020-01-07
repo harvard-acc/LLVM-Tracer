@@ -17,6 +17,7 @@
 
 #include <cstdio>
 #include <fstream>
+#include <iostream>
 #include <map>
 #include <stack>
 #include <sys/stat.h>
@@ -33,17 +34,24 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "clang/Tooling/Tooling.h"
+#include "llvm/Support/Debug.h"
 
 using namespace clang;
 using namespace clang::driver;
 using namespace clang::tooling;
 using namespace llvm;
 
+#define DEBUG_TYPE "get-labeled-stmts"
+
 // The option categories, to group options in the man page. It is useless
 // here, since we don't have any new options in this tool.
 // Declaring here because CommonOptionsParser requires this one in LLVM 3.5.
 // http://llvm.org/docs/CommandLine.html#grouping-options-into-categories
 cl::OptionCategory GetLabelStmtsCat("GetLabelStmts options");
+static cl::opt<std::string> OutputFileName("output",
+                                           cl::desc("Specify output filename"),
+                                           cl::value_desc("filename"),
+                                           cl::init("labelmap"));
 
 // A class containing all the labels and caller information for a function.
 class FunctionInfo {
@@ -89,7 +97,7 @@ class FunctionInfo {
 
 // Maps pairs of (func_name, label_name) to line numbers.
 static std::map<std::string, FunctionInfo> labelMap;
-static const std::string outputFileName = "labelmap";
+static std::string outputFileName;
 
 class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
  private:
@@ -107,8 +115,8 @@ class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
                      const FunctionDecl* func) const {
     SourceLocation loc = subStmt->getLocStart();
     unsigned line = srcManager->getExpansionLineNumber(loc);
-    std::string labelName(labelStmt->getName());
-    const std::string& funcName = func->getName().str();
+    const std::string& labelName = labelStmt->getName();
+    const std::string& funcName = func->getQualifiedNameAsString();
     labelMap[funcName][labelName] = line;
   }
 
@@ -144,8 +152,8 @@ class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
     if (callExpr) {
       const FunctionDecl* callee = callExpr->getDirectCallee();
       if (callee) {
-        labelMap[callee->getName().str()].add_caller(
-            caller_func->getName().str());
+        labelMap[callee->getQualifiedNameAsString()].add_caller(
+            caller_func->getQualifiedNameAsString());
       }
     }
   }
@@ -169,9 +177,13 @@ class LabeledStmtVisitor : public RecursiveASTVisitor<LabeledStmtVisitor> {
   }
 
   // For each function, recursively find every child label statement.
-  virtual bool VisitFunctionDecl(const FunctionDecl* func) const {
+  bool VisitFunctionDecl(const FunctionDecl *func) const {
+    // Only support free functions, not class member functions or templates.
+    if (isa<CXXMethodDecl>(func))
+      return true;
+
     if (func->hasBody()) {
-      const std::string& funcName = func->getName().str();
+      const std::string& funcName = func->getQualifiedNameAsString();
       if (labelMap.find(funcName) == labelMap.end())
         labelMap[funcName] = FunctionInfo();
 
@@ -201,9 +213,10 @@ class LabeledStmtASTConsumer : public ASTConsumer {
 
 class LabeledStmtFrontendAction : public ASTFrontendAction {
  public:
-  virtual ASTConsumer* CreateASTConsumer(CompilerInstance& CI, StringRef file) {
-    return new LabeledStmtASTConsumer(&CI);
-  }
+   virtual std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
+                                                          StringRef file) {
+     return std::unique_ptr<ASTConsumer>(new LabeledStmtASTConsumer(&CI));
+   }
 
   // Write a label to line number mapping to the labelmap file.
   //
@@ -296,19 +309,11 @@ static void cleanup() {
 }
 
 int main(int argc, const char** argv) {
-#if (LLVM_VERSION == 34)
-  CommonOptionsParser op(argc, argv);
-#elif (LLVM_VERSION == 35)
   CommonOptionsParser op(argc, argv, GetLabelStmtsCat);
-#endif
-
   ClangTool Tool(op.getCompilations(), op.getSourcePathList());
+  outputFileName = OutputFileName.getValue();
   cleanup();
 
-  // In llvm 3.4, newFrontendActionFactory returns raw pointers.
-  // In llvm 3.5, it returns unique_ptr<>
-  // Use unique_ptr to keep pointers, therefore being compatible with
-  // LLVM 3.4/3.5
   std::unique_ptr<FrontendActionFactory>
         actionfactory(newFrontendActionFactory<LabeledStmtFrontendAction>());
   int result = Tool.run(actionfactory.get());

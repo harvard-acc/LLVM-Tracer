@@ -5,8 +5,12 @@
 #include "llvm/Pass.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/ModuleSlotTracker.h"
 
 extern char s_phi[];
+
+using namespace llvm;
 
 // Get the bitwidth of this type.
 int getMemSize(Type *T);
@@ -136,16 +140,26 @@ class Tracer : public FunctionPass {
     void printTopLevelEntryFirstLine(Instruction *I, InstEnv *env,
                                      int num_params);
 
+    // Update the tracer logging status on this instruction.
+    //
+    // This is usually only called to inform the tracer to start or stop
+    // tracing after calling or returning from a top level function.
+    void updateTracerStatus(Instruction *I, InstEnv *env, int opcode);
+
     // Should we trace this function or not?
     bool traceOrNot(const std::string& func);
     // Does this function appear in our list of tracked functions?
     bool isTrackedFunction(const std::string& func);
     // Is this function one of the special DMA functions?
     bool isDmaFunction(const std::string& funcName);
+    // Is this function one of the special Host memory functions?
+    bool isHostMemFunction(const std::string& funcName);
     // Is this function an LLVM intrinsic?
     bool isLLVMIntrinsic(const std::string& func);
     // Is this function math operation?
     bool isSpecialMathOp(const std::string& func);
+    // Is this set sampling factor function?
+    bool isSetSamplingFactor(const std::string &funcName);
 
     // Construct an ID for the given instruction.
     //
@@ -213,6 +227,30 @@ class Tracer : public FunctionPass {
     // just return the Constant*.
     Constant *createStringArgIfNotExists(const char *str);
 
+    // Collect debug information in the current function.
+    //
+    // Release builds of LLVM 6 discards value names when emitting LLVM IR. This
+    // behavior cannot be overriden from the driver, only directly via cc1,
+    // which is not practical. However, this information is still available via
+    // the embedded debug info, so we can fallback on this if value names are
+    // not present.
+    //
+    // This must be done before runOnFunction() is called.
+    void collectDebugInfo(DbgInfoIntrinsic *debug);
+
+    // Purge the debug info cache for this function.
+    void purgeDebugInfo();
+
+    // Value name lookup wrapper function.
+    //
+    // If value->hasName() returns false, this looks up the value's name in the
+    // debug info cache. This returns a pair of bool and StringRef, where where
+    // the bool indicates whether a name was found or not. The StringRef is the
+    // result of the lookup and is always valid; when a name are not found, it
+    // will be empty.
+    using ValueNameLookup = std::pair<bool, StringRef>;
+    ValueNameLookup getValueName(Value *value);
+
     // The attributes that define a VectorType are the number of elements, the
     // size of each element in bytes, and the element type ID.
     //
@@ -227,9 +265,11 @@ class Tracer : public FunctionPass {
     Value *TL_log0;
     Value *TL_log_int;
     Value *TL_log_ptr;
+    Value *TL_log_string;
     Value *TL_log_double;
     Value *TL_log_vector;
     Value *TL_log_entry;
+    Value *TL_update_status;
 
     // The current module.
     Module *curr_module;
@@ -238,14 +278,20 @@ class Tracer : public FunctionPass {
     Function *curr_function;
 
     // Local slot tracker for the current function.
-    SlotTracker *st;
+    ModuleSlotTracker *st;
 
     // All functions we are tracking.
-    std::set<std::string> tracked_functions;
+    std::set<StringRef> tracked_functions;
 
     // True if WORKLOAD specifies a single function, in which case the tracer
     // will track all functions called by it (the top-level function).
     bool is_toplevel_mode;
+
+    // Contains debug info for the entire module.
+    DebugInfoFinder debugInfoFinder;
+
+    // Maps linkage (mangled) name to ordinary name.
+    std::map<StringRef, StringRef> mangledNameMap;
 
     // Map of stack-allocated vector buffers and their type keys.
     //
@@ -264,6 +310,12 @@ class Tracer : public FunctionPass {
     // Since slot numbers are reused across functions, this has to be cleared
     // when we switch to a new function.
     std::map<unsigned, std::string> slotToVarName;
+
+    // Debug info cache of value names.
+    std::map<Value*, StringRef> valueDebugName;
+
+    // Preheader branch instructions and their line numbers.
+    std::map<Instruction*, int> preheaderLineNum;
 };
 
 /* Reads a labelmap file and inserts it into the dynamic trace.

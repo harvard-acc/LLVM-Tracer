@@ -1,6 +1,6 @@
 # In two-number form only. LLVM-Tracer will determine the patch version for you.
 if(NOT DEFINED LLVM_RECOMMEND_VERSION)
-  SET(LLVM_RECOMMEND_VERSION 3.4)
+  SET(LLVM_RECOMMEND_VERSION 6.0)
 endif()
 
 # TODO : not used now
@@ -8,8 +8,8 @@ endif()
 SET(NEED_LLVM_LIB mcjit native bitwriter jit interpreter
 		nativecodegen linker irreader)
 
-SET(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -Wall -W -Wno-unused-parameter
-	-Wwrite-strings -pedantic -Wno-long-long -std=c++11)
+SET(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -Wall -W -Wno-strict-aliasing
+    -Wno-unused-parameter -Wwrite-strings -pedantic -Wno-long-long -std=c++11)
 STRING(REPLACE ";" " " CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
 # sets debug level to g3, which contains more infomation than g2.

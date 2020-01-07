@@ -42,7 +42,6 @@ target_link_libraries(get-labeled-stmts
   LLVMScalarOpts
   LLVMInstCombine
   LLVMTransformUtils
-  LLVMipa
   LLVMAnalysis
   LLVMTarget
   LLVMOption # Support
