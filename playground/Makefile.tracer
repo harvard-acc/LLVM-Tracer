@@ -4,9 +4,9 @@
 
 CURRENT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 COMMON_DIR := $(CURRENT_DIR)
-SUFFIX = cpp
-SRCS = $(wildcard *.$(SUFFIX))
+SUFFIX = cc
 EXEC = test
+SRCS = $(EXEC).$(SUFFIX)
 
 .PHONY: trace-binary run-trace clean
 
@@ -52,17 +52,18 @@ $(EXEC)-instrumented: full.s
 	$(CXX) -static -O0 -fno-inline -o $@ $< -lm -lz -pthread
 
 %-opt.llvm: %.$(SUFFIX) labelmap
-	clang -static -g -O1 -S -fno-slp-vectorize -fno-vectorize -fno-unroll-loops \
-        -fno-inline -fno-builtin -emit-llvm \
-				$(CPPFLAGS) \
-        $(BMARK_SPECIFIC_CFLAGS) \
-        -o $*.llvm $<
+	@$(eval CC1_COMMAND=$(shell clang -static -g -O1 -S -fno-slp-vectorize \
+		-fno-vectorize -fno-unroll-loops -fno-inline -fno-builtin \
+		-emit-llvm \
+		$(BMARK_SPECIFIC_CFLAGS) \
+		-o $*.llvm $< -### 2>&1 >/dev/null | tail -n 1 | sed 's/"-discard-value-names"//g'))
+	$(CC1_COMMAND)
 	opt -S -load=$(TRACER) -fulltrace -labelmapwriter $*.llvm -o $@
 
 clean:
 	rm -f *.llvm
 	rm -f *.o
-	rm -f dynamic_trace.gz
+	rm -f dynamic_trace*.gz
 	rm -f *-instrumented
 	rm -f full.s
 	rm -f labelmap
