@@ -23,13 +23,32 @@ Requirements:
 
 Build:
 -----------------
-**Breaking changes from v1.2 to v2.0:**
+**January 2020: New features**
+
+## Breaking changes from v1.2 to v2.0: ##
 
   * LLVM-Tracer now uses LLVM 6.0. Support for all previous versions of LLVM
     have been removed. Minor versions 6.0.0 and 6.0.1 have been tested to work.
-  * C++ is now supported in un-instrumented modes. That is, you can write C++
-    to build your applications and only have LLVM-Tracer instrument and generate
-    dynamic traces for the parts that only use C features.
+
+## C++ support ##
+
+LLVM-Tracer now supports C++ for uninstrumented code! Users can write C++
+to build applications and only have LLVM-Tracer instrument and generate
+dynamic traces for the parts that are written in pure C with C-style linkage.
+limited to writing pure C programs. Now, you can make use of all the features
+For example: if you write a C++ class that calls a function foo which is in an
+`extern C` context, you can trace foo(), but you cannot trace a function like
+the class's constructor.
+
+See playground/test.cc for a live example.
+
+## Multithreading support ##
+
+LLVM-Tracer can now trace multithreaded applications. Each thread should call
+the `llvmtracer_set_trace_name` API first to assign a unique name for the
+dynamic trace file that will be produced.
+
+See playground/multithreading.cc for an example.
 
 **Breaking changes from v1.1 to v1.2:**
 
