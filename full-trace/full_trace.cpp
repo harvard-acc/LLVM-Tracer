@@ -994,10 +994,6 @@ void Tracer::handleCallInstruction(Instruction* inst, InstEnv* env) {
     opcode = HOST_LOAD;
   else if (fun->getName() == "hostStore")
     opcode = HOST_STORE;
-  else if (fun->getName() == "sin")
-    opcode = SINE;
-  else if (fun->getName() == "cos")
-    opcode = COSINE;
   else if (fun->isIntrinsic())
     opcode = INTRINSIC;
   else
