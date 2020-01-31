@@ -65,7 +65,7 @@ FUNCTION(CHECK_LLVM_CONFIG_VERSION_OR_AUTOINSTALL LLVM_ROOT
       set(AUTOINSTALL FALSE)
       find_LLVM_CONFIG_EXE(${LLVM_ROOT} ${LLVM_RECOMMEND_VERSION})
     else()
-      message(FATAL_ERROR "LLVM version is recommanded to be : "
+      message(FATAL_ERROR "LLVM version should be: "
          "${LLVM_RECOMMEND_VERSION}\n"
          "Your current version is ${LLVM_VERSION}")
     endif()
