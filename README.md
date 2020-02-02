@@ -14,21 +14,29 @@ International Symposium on Performance Analysis of Systems and Software
 
 Requirements:
 -------------------
-  1. LLVM 6.0 and Clang 6.0 64-bit. It is highly recommended that users
-     download the packages prebuilt by LLVM and install with the system's
-     package manager (apt/yum/etc), rather than building the toolchain from
-     source.
+We *highly* recomend that users use the provided Docker image, available for download
+[here](https://hub.docker.com/repository/docker/xyzsam/gem5-aladdin). This will solve
+basically all environment issues. If you cannot use Docker, then read on.
+
+  1. LLVM 6.0 and Clang 6.0 64-bit. Users cannot download a pre-built package
+     because the Release build type strips value names from LLVM IR, and
+     working around this is difficult. Instead, users must built the toolchain
+     from source.
   2. GCC 5.4 or later.
   3. CMake 2.8.12 or newer.
 
 Build:
 -----------------
-**January 2020: New features**
+**Feburary 2020: New features**
 
 ## Breaking changes from v1.2 to v2.0: ##
 
   * LLVM-Tracer now uses LLVM 6.0. Support for all previous versions of LLVM
     have been removed. Minor versions 6.0.0 and 6.0.1 have been tested to work.
+  * The Release build type of LLVM 6.0 and Clang 6.0 will strip value names
+    from the generated LLVM IR, which breaks the tracer. To avoid this problem,
+    it is *highly* recommended that you build the `Debug` build type by adding
+    the cmake flag `-DCMAKE_BUILD_TYPE=Debug`.
 
 ## C++ support ##
 
@@ -89,7 +97,7 @@ See playground/multithreading.cc for an example.
      ```
      mkdir build/
      cd build
-     cmake .. -DLLVM_ROOT=/where/to/install/LLVM -DAUTOINSTALL=TRUE
+     cmake .. -DLLVM_ROOT=/where/to/install/LLVM -DAUTOINSTALL=TRUE -DCMAKE_BUILD_TYPE=Debug
      make
      make install
      ```
@@ -112,12 +120,12 @@ See playground/multithreading.cc for an example.
        install LLVM for you if finds no LLVM installation. Using this
        function requires tar-1.22 or newer to extract xz format.
 
-       The default installation path is under /your/build_dir/lib/llvm-3.x.
+       The default installation path is under /your/build_dir/lib/llvm-x.x.
        You can manually define the installation path by
        -DLLVM_ROOT=/where/to/install.
 
      -DCMAKE_BUILD_TYPE=None,Debug,Release    (default : None)
-       You can choose one from three of bulid types.
+       It is recommended to use the Debug build type for LLVM 6.0.
      ```
 
 
