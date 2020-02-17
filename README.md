@@ -14,9 +14,10 @@ International Symposium on Performance Analysis of Systems and Software
 
 Requirements:
 -------------------
-We *highly* recomend that users use the provided Docker image, available for download
-[here](https://hub.docker.com/repository/docker/xyzsam/gem5-aladdin). This will solve
-basically all environment issues. If you cannot use Docker, then read on.
+We *highly* recommend that users use the provided Docker image, available for
+download [here](https://hub.docker.com/repository/docker/xyzsam/gem5-aladdin).
+This will solve basically all environment issues. If you cannot use Docker,
+then read on.
 
   1. LLVM 6.0 and Clang 6.0 64-bit. Users cannot download a pre-built package
      because the Release build type strips value names from LLVM IR, and
@@ -25,11 +26,12 @@ basically all environment issues. If you cannot use Docker, then read on.
   2. GCC 5.4 or later.
   3. CMake 2.8.12 or newer.
 
-Build:
+Changelog:
 -----------------
-**Feburary 2020: New features**
 
-## Breaking changes from v1.2 to v2.0: ##
+### Feburary 2020: v2 new features ###
+
+**Breaking changes from v1.2 to v2.0:**
 
   * LLVM-Tracer now uses LLVM 6.0. Support for all previous versions of LLVM
     have been removed. Minor versions 6.0.0 and 6.0.1 have been tested to work.
@@ -38,7 +40,7 @@ Build:
     it is *highly* recommended that you build the `Debug` build type by adding
     the cmake flag `-DCMAKE_BUILD_TYPE=Debug`.
 
-## C++ support ##
+#### C++ support ####
 
 LLVM-Tracer now supports C++ for uninstrumented code! Users can write C++
 to build applications and only have LLVM-Tracer instrument and generate
@@ -50,13 +52,15 @@ the class's constructor.
 
 See playground/test.cc for a live example.
 
-## Multithreading support ##
+#### Multithreading support ####
 
 LLVM-Tracer can now trace multithreaded applications. Each thread should call
 the `llvmtracer_set_trace_name` API first to assign a unique name for the
 dynamic trace file that will be produced.
 
 See playground/multithreading.cc for an example.
+
+### November 2016: v1.2 changelog ###
 
 **Breaking changes from v1.1 to v1.2:**
 
@@ -66,6 +70,9 @@ See playground/multithreading.cc for an example.
   *  LLVM-Tracer will install all built files to the subdirectories `bin/` and
     `lib/` instead of `full-trace/` and `profile-func/`. The `BUILD_ON_SOURCE`
     option has been removed.
+
+Build:
+-----------------
 
   CMake is a configure tool which allows you to do out-of-source build.
   LLVM-Tracer requires CMake newer than 2.8.12. By default, CMake
