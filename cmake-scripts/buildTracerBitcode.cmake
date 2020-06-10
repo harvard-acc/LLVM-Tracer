@@ -16,11 +16,11 @@ function(build_tracer_bitcode TEST_NAME f_SRC WORKLOAD)
 
   set(OPT_FLAGS "-disable-inlining" "-S" "-load=${FULLTRACE_SO}" "-fulltrace")
   set(LLC_FLAGS "-O0" "-disable-fp-elim" "-filetype=asm")
-  set(FINAL_CXX_FLAGS "-O0" "-fno-inline")
+  set(FINAL_CXX_FLAGS "-O0" "-fno-inline" "-static")
 
   # Add ZLIB location.
   get_filename_component(ZLIB_LIB_DIR ${ZLIB_LIBRARIES} DIRECTORY)
-  set(FINAL_CXX_LDFLAGS "-lm" "-L${ZLIB_LIB_DIR}" "-lz")
+  set(FINAL_CXX_LDFLAGS "-lm" "-L${ZLIB_LIB_DIR}" "-lz" "-lpthread")
 
   set(LLVMC_FLAGS ${LLVMC_FLAGS} ${CFLAGS})
   build_llvm_bitcode(${TEST_NAME} ${f_SRC})
