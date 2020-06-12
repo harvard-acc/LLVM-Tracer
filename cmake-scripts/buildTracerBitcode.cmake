@@ -16,7 +16,7 @@ function(build_tracer_bitcode TEST_NAME f_SRC WORKLOAD)
 
   set(OPT_FLAGS "-disable-inlining" "-S" "-load=${FULLTRACE_SO}" "-fulltrace")
   set(LLC_FLAGS "-O0" "-disable-fp-elim" "-filetype=asm")
-  set(FINAL_CXX_FLAGS "-O0" "-fno-inline" "-static")
+  set(FINAL_CXX_FLAGS "-O0" "-fno-inline" "-no-pie")
 
   # Add ZLIB location.
   get_filename_component(ZLIB_LIB_DIR ${ZLIB_LIBRARIES} DIRECTORY)
