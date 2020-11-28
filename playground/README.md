@@ -16,7 +16,13 @@ The below will build trace binary for test.c.
 ```
 make trace-binary SUFFIX=c
 ```
-To build for other files, change the EXEC variable.
+To build for other files, change the EXEC variable. EXEC is the name of the
+file.
 ```
 make trace-binary EXEC=multithreading
+```
+You may also need to change the TOP_LEVEL variable, which sets the entry
+function of your accelerator. For the triad example, it would be:
+```
+make trace-binary EXEC=triad TOP_LEVEL=triad SUFFIX=c
 ```
